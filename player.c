@@ -30,6 +30,12 @@ int getCommand(char* command) {
     else { return 0;}
 }
 
+void startCommand(char input[]) {
+    char *rest = strchr(input, ' ');
+    rest++;
+    printf("%s\n", rest);
+}
+
 int main(int argc, char *argv[]) {
     
     char *GSIP = NULL;
@@ -37,6 +43,7 @@ int main(int argc, char *argv[]) {
     
     int OPCODE;
     char line[128];
+    char input[128];
 
     if (argc == 5){                                     // every argument was specified
         GSIP = argv[2];
@@ -62,13 +69,15 @@ int main(int argc, char *argv[]) {
     // main loop
     while(1) {
         fgets(line, sizeof(line), stdin);               // read the line
-        line[strcspn(line, "\n")] = '\0';               // Remove trailing newline, if any
+        strcpy(input, line);                            // keep the original input
         char *command = strtok(line, " ");              // get the first word
+        command[strcspn(command, "\n")] = '\0';
         OPCODE = getCommand(command);
 
         switch (OPCODE) {
             case 1:                                     // start command
                 printf("START NEW GAME\n");
+                startCommand(input);
                 break;
             case 2:
                 printf("TRY\n");
@@ -95,3 +104,6 @@ int main(int argc, char *argv[]) {
         }
     }
 }
+
+
+//setsockopt
