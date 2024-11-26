@@ -30,10 +30,49 @@ int getCommand(char* command) {
     else { return 0;}
 }
 
-void startCommand(char input[]) {
-    char *rest = strchr(input, ' ');
-    rest++;
-    printf("%s\n", rest);
+void startCommand(char input[], int fd, struct addrinfo *res) {
+    
+    ssize_t n;
+    socklen_t addrlen;
+    struct sockaddr_in addr;
+    char CMD[6];
+    char PLID [7];
+    char TIME [4];
+    char MSG[16];
+    char buffer[128];
+
+    sscanf(input, "%s %s %s", CMD, PLID, TIME);
+    memset(MSG, 0, sizeof(MSG));
+
+    // Player ID is a 6 digit number
+    if (strlen(PLID) != 6 || strspn(PLID, "0123456789") != 6) {
+        fprintf(stderr, "[ERR]: Invalid PLID: %s\n", PLID);
+        exit(1);
+    }
+
+    // Play time is a 3 digit number between 1 and 600
+    int play_time = atoi(TIME);
+    if (play_time < 1 || play_time > 600) {
+        fprintf(stderr, "[ERR]: Invalid time: %s\n", TIME);
+        exit(1);
+    }
+
+    //printf("%s\n", CMD);
+    //printf("%s\n", PLID);
+    //printf("%s\n", TIME);
+
+    // Message format has to end with \n
+    MSG[15] = '\n'; 
+
+    snprintf(MSG, sizeof(MSG), "SNG %s %s\n", PLID, TIME);
+
+    n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
+    if(n==-1) /*error*/ exit(1);
+
+    addrlen=sizeof(addr);
+    n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
+    if(n==-1) /*error*/ exit(1);
+    write(1,buffer,n);
 }
 
 int main(int argc, char *argv[]) {
@@ -44,6 +83,9 @@ int main(int argc, char *argv[]) {
     int OPCODE;
     char line[128];
     char input[128];
+
+    int udp_fd,errcode;
+    struct addrinfo hints,*res;
 
     if (argc == 5){                                     // every argument was specified
         GSIP = argv[2];
@@ -66,6 +108,21 @@ int main(int argc, char *argv[]) {
 
     printf("ip: %s\t port: %s\n", GSIP, GSPORT);
 
+    // UDP Socket
+    udp_fd=socket(AF_INET,SOCK_DGRAM,0); 
+    if(udp_fd==-1) {
+        printf("[ERR]: Couldn't create UDP socket\n");
+        exit(1);
+    }
+    memset(&hints,0,sizeof hints);
+    hints.ai_family=AF_INET;                            //IPv4
+    hints.ai_socktype=SOCK_DGRAM;                       //UDP socket
+    errcode=getaddrinfo(GSIP, GSPORT, &hints, &res);
+    if(errcode!=0) {
+        printf("[ERR]: Couldn't get address info\n");
+        exit(1);
+    }
+
     // main loop
     while(1) {
         fgets(line, sizeof(line), stdin);               // read the line
@@ -77,7 +134,7 @@ int main(int argc, char *argv[]) {
         switch (OPCODE) {
             case 1:                                     // start command
                 printf("START NEW GAME\n");
-                startCommand(input);
+                startCommand(input, udp_fd, res);
                 break;
             case 2:
                 printf("TRY\n");
@@ -90,9 +147,13 @@ int main(int argc, char *argv[]) {
                 break;
             case 5:
                 printf("QUIT\n");
+                freeaddrinfo(res);
+                close(udp_fd);
                 exit(1);
             case 6:
                 printf("exit\n");
+                freeaddrinfo(res);
+                close(udp_fd);
                 exit(1);
                 break;
             case 7:
