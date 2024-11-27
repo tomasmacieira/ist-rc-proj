@@ -44,6 +44,9 @@ void parseArguments(int argc, char *argv[], char **GSIP, char **GSPORT) {
 int createUDPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res) {
     int udp_fd, errcode;
     struct addrinfo hints;
+    struct timeval timeout;
+    timeout.tv_sec = 2;     // 2 seconds
+    timeout.tv_usec = 0;
 
     // Create UDP socket
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -65,6 +68,12 @@ int createUDPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res)
         exit(EXIT_FAILURE);
     }
 
+    if (setsockopt(udp_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        fprintf(stderr, "[ERR]: setsockopt failed\n");
+        close(udp_fd);
+        exit(EXIT_FAILURE);
+    }
+
     return udp_fd; // Return the socket file descriptor
 }
 
@@ -81,22 +90,24 @@ int getCommand(char* command) {
     else { return 0;}
 }
 
-void startCommand(char input[], int fd, struct addrinfo *res) {
+void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
     
     ssize_t n;
     socklen_t addrlen;
     struct sockaddr_in addr;
-    struct timeval timeout;
-    timeout.tv_sec = 2;     // 2 seconds
-    timeout.tv_usec = 0;
     char CMD[6];
     char PLID [7];
     char TIME [4];
     char MSG[16];
-    char buffer[128];
+    char buffer[128];        
 
     sscanf(input, "%s %s %s", CMD, PLID, TIME);
+
+    // Register PLID for future context
+    strcpy(player, PLID); 
+
     memset(MSG, 0, sizeof(MSG));
+    memset(buffer, 0, sizeof(buffer));
 
     // Player ID is a 6 digit number
     if (strlen(PLID) != 6 || strspn(PLID, "0123456789") != 6) {
@@ -112,14 +123,9 @@ void startCommand(char input[], int fd, struct addrinfo *res) {
     }
 
     // Message format has to end with \n
-    MSG[15] = '\n'; 
+    MSG[15] = '\n';
     snprintf(MSG, sizeof(MSG), "SNG %s %s\n", PLID, TIME);
 
-    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-        fprintf(stderr, "[ERR]: setsockopt failed\n");
-        close(fd);
-        exit(EXIT_FAILURE);
-    }
     //printf("%s", MSG);
     n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
     if(n==-1) /*error*/ exit(1);
@@ -130,13 +136,49 @@ void startCommand(char input[], int fd, struct addrinfo *res) {
 
     // handle not recieving response
     while (n < 1) {
-        printf("entrou\n");
         n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
         if(n==-1) /*error*/ exit(1);
         n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
         if(n==-1) /*error*/ exit(1);
 
     }
+    write(1,buffer,n);
+}
+
+void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[]) {
+
+    ssize_t n;
+    socklen_t addrlen;
+    struct sockaddr_in addr;
+    struct timeval timeout;
+    timeout.tv_sec = 2;     // 2 seconds
+    timeout.tv_usec = 0;
+    char CMD[5];
+    char MSG[12];
+    char buffer[128];        
+
+    memset(MSG, 0, sizeof(MSG));
+    memset(buffer, 0, sizeof(buffer));
+
+    MSG[11] = '\n';
+    snprintf(MSG, sizeof(MSG), "QUT %s\n", PLID);
+    
+    printf("%s", MSG);
+    n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
+    if(n==-1) /*error*/ exit(1);
+
+    addrlen=sizeof(addr);
+    n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
+    if(n==-1) /*error*/ exit(1);
+
+    // handle not recieving response
+    while (n < 1) {
+        n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
+        if(n==-1) /*error*/ exit(1);
+        n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
+        if(n==-1) /*error*/ exit(1);
+    }
+
     write(1,buffer,n);
 }
 
@@ -148,6 +190,7 @@ int main(int argc, char *argv[]) {
     int OPCODE;
     char line[128];
     char input[128];
+    char player[7];
 
     int udp_fd,errcode;
     struct addrinfo *res;
@@ -168,7 +211,7 @@ int main(int argc, char *argv[]) {
 
         switch (OPCODE) {
             case 1:                                     // start command
-                startCommand(input, udp_fd, res);
+                startCommand(input, udp_fd, res, player);
                 break;
             case 2:
                 break;
@@ -176,10 +219,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 4:
                 break;
-            case 5:
-                freeaddrinfo(res);
-                close(udp_fd);
-                exit(1);
+            case 5:                                     // quit command
+                quitCommand(input, udp_fd, res, player);
+                break;
             case 6:
                 freeaddrinfo(res);
                 close(udp_fd);
