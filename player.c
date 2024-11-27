@@ -90,6 +90,54 @@ int getCommand(char* command) {
     else { return 0;}
 }
 
+void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *trialCount) {
+    ssize_t n;
+    socklen_t addrlen;
+    struct sockaddr_in addr;
+    char CMD[4];
+    char C1[2], C2[2], C3[2], C4[2];
+    char MSG[64];
+    char buffer[128];
+
+    memset(MSG, 0, sizeof(MSG));
+    memset(buffer, 0, sizeof(buffer));
+
+    // Parse input to extract the guess
+    sscanf(input, "%s %s %s %s %s", CMD, C1, C2, C3, C4);
+
+    // Validate command format
+    if (strlen(C1) != 1 || strlen(C2) != 1 || strlen(C3) != 1 || strlen(C4) != 1) {
+        fprintf(stderr, "[ERR]: Invalid code format. Each guess must be a single character.\n");
+        return;
+    }
+
+    // Prepare the message including the trial number
+    snprintf(MSG, sizeof(MSG), "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, *trialCount);
+    
+    // printf("%s", MSG);
+    // Send the message to the server
+    n = sendto(fd, MSG, strlen(MSG), 0, res->ai_addr, res->ai_addrlen);
+    if (n == -1) {
+        fprintf(stderr, "[ERR]: Failed to send TRY command.\n");
+        return;
+    }
+
+    // Increment trial count
+    (*trialCount)++;
+
+    // Receive the response
+    addrlen = sizeof(addr);
+    n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, (struct sockaddr *)&addr, &addrlen);
+    if (n == -1) {
+        fprintf(stderr, "[ERR]: No response from server. Retrying...\n");
+        return;
+    }
+
+    buffer[n] = '\0'; // Null-terminate the received message
+
+    printf("%s", buffer);
+}
+
 void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
     
     ssize_t n;
@@ -197,7 +245,7 @@ int main(int argc, char *argv[]) {
     char line[128];
     char input[128];
     char player[7];
-
+    int trialCount = 1; // Initialize trial counter
     int udp_fd,errcode;
     struct addrinfo *res;
     
@@ -220,6 +268,7 @@ int main(int argc, char *argv[]) {
                 startCommand(input, udp_fd, res, player);
                 break;
             case 2:
+                tryCommand(input, udp_fd, res, player, &trialCount);
                 break;
             case 3:
                 break;
