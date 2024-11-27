@@ -135,7 +135,15 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
 
     buffer[n] = '\0'; // Null-terminate the received message
 
-    printf("%s", buffer);
+    // handle not recieving response
+    while (n < 1) {
+        n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
+        if(n==-1) /*error*/ exit(1);
+        n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
+        if(n==-1) /*error*/ exit(1);
+
+    }
+    write(1,buffer,n);
 }
 
 void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
