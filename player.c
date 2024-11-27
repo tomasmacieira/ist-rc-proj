@@ -145,7 +145,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
     write(1,buffer,n);
 }
 
-void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[]) {
+void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[], int exitCommand) {
 
     ssize_t n;
     socklen_t addrlen;
@@ -180,6 +180,12 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[]) {
     }
 
     write(1,buffer,n);
+
+    if (exitCommand) { // in case user asked to exit the app
+        freeaddrinfo(res);
+        close(fd);
+        exit(0);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -220,12 +226,10 @@ int main(int argc, char *argv[]) {
             case 4:
                 break;
             case 5:                                     // quit command
-                quitCommand(input, udp_fd, res, player);
+                quitCommand(input, udp_fd, res, player, 0);
                 break;
-            case 6:
-                freeaddrinfo(res);
-                close(udp_fd);
-                exit(1);
+            case 6:                                     // exit command
+                quitCommand(input, udp_fd, res, player, 1);
                 break;
             case 7:
                 break;
