@@ -179,7 +179,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
     }
 
     // Message format has to end with \n
-    MSG[15] = '\n';
+    //MSG[15] = '\n';
     snprintf(MSG, sizeof(MSG), "SNG %s %s\n", PLID, TIME);
 
     //printf("%s", MSG);
@@ -216,7 +216,7 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[], int ex
     memset(MSG, 0, sizeof(MSG));
     memset(buffer, 0, sizeof(buffer));
 
-    MSG[11] = '\n';
+    //MSG[11] = '\n';
     snprintf(MSG, sizeof(MSG), "QUT %s\n", PLID);
     
     printf("%s", MSG);
@@ -242,6 +242,65 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[], int ex
         close(fd);
         exit(0);
     }
+}
+
+void debugCommand(char input[], int fd, struct addrinfo *res, char player[]) {
+       
+    ssize_t n;
+    socklen_t addrlen;
+    struct sockaddr_in addr;
+    char CMD[6];
+    char PLID [7];
+    char TIME [4];
+    char MSG[32];
+    char buffer[128];  
+    char C1[2], C2[2], C3[2], C4[2];    
+
+    sscanf(input, "%s %s %s %s %s %s %s", CMD, PLID, TIME, C1, C2, C3, C4);
+    strcpy(player, PLID);
+
+    memset(MSG, 0, sizeof(MSG));
+    memset(buffer, 0, sizeof(buffer));
+
+    // Player ID is a 6 digit number
+    if (strlen(PLID) != 6 || strspn(PLID, "0123456789") != 6) {
+        fprintf(stderr, "[ERR]: Invalid PLID: %s\n", PLID);
+        return;
+    }
+
+    // Validate command format
+    if (strlen(C1) != 1 || strlen(C2) != 1 || strlen(C3) != 1 || strlen(C4) != 1) {
+        fprintf(stderr, "[ERR]: Invalid code format. Each guess must be a single character.\n");
+        return;
+    }
+
+    // Play time is a 3 digit number between 1 and 600
+    int play_time = atoi(TIME);
+    if (play_time < 1 || play_time > 600) {
+        fprintf(stderr, "[ERR]: Invalid time: %s\n", TIME);
+        return;
+    }
+
+    // Prepare the message including the trial number
+    snprintf(MSG, sizeof(MSG), "DBG %s %s %s %s %s %s\n", PLID, TIME, C1, C2, C3, C4);
+
+    printf("%s", MSG);
+    n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
+    if(n==-1) /*error*/ exit(1);
+
+    addrlen=sizeof(addr);
+    n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
+    if(n==-1) /*error*/ exit(1);
+
+    // handle not recieving response
+    while (n < 1) {
+        n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
+        if(n==-1) /*error*/ exit(1);
+        n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
+        if(n==-1) /*error*/ exit(1);
+
+    }
+    write(1,buffer,n);
 }
 
 int main(int argc, char *argv[]) {
@@ -288,7 +347,9 @@ int main(int argc, char *argv[]) {
             case 6:                                     // exit command
                 quitCommand(input, udp_fd, res, player, 1);
                 break;
+            // Debug command
             case 7:
+                debugCommand(input, udp_fd, res, player);
                 break;
             default:
                 fprintf(stderr, "[ERR]: WRONG FORMAT\n");
