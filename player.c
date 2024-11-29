@@ -63,7 +63,7 @@ int createUDPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res)
     // Get address info
     errcode = getaddrinfo(GSIP, GSPORT, &hints, res);
     if (errcode != 0) {
-        fprintf(stderr, "[ERR]: Couldn't get address info: %s\n", gai_strerror(errcode));
+        fprintf(stderr, "[ERR]: Couldn't get address info\n");
         close(udp_fd);
         exit(EXIT_FAILURE);
     }
@@ -75,6 +75,33 @@ int createUDPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res)
     }
 
     return udp_fd; // Return the socket file descriptor
+}
+
+int createTCPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res) {
+    int tcp_fd, errcode;
+    struct addrinfo hints;
+    struct timeval timeout;
+    timeout.tv_sec = 2;                                             // 2 seconds
+    timeout.tv_usec = 0;
+
+    tcp_fd = socket(AF_INET,SOCK_STREAM,0);                         //TCP socket
+    if (tcp_fd==-1) {
+        fprintf(stderr, "[ERR]: Couldn't create TCP socket\n");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&hints,0,sizeof hints);
+    hints.ai_family=AF_INET;                                        //IPv4
+    hints.ai_socktype=SOCK_STREAM;                                  //TCP socket
+
+    errcode=getaddrinfo(GSIP, GSPORT, &hints, res);
+    if (errcode != 0) {
+        fprintf(stderr, "[ERR]: Couldn't get address info\n");
+        close(tcp_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    return tcp_fd;
 }
 
 int getCommand(char* command) {
@@ -178,7 +205,6 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
         return;
     }
 
-    // Message format has to end with \n
     //MSG[15] = '\n';
     snprintf(MSG, sizeof(MSG), "SNG %s %s\n", PLID, TIME);
 
@@ -312,15 +338,18 @@ int main(int argc, char *argv[]) {
     char line[128];
     char input[128];
     char player[7];
-    int trialCount = 1; // Initialize trial counter
-    int udp_fd,errcode;
-    struct addrinfo *res;
+    int trialCount = 1;                                 // Initialize trial counter
+    int udp_fd, tcp_fd, errcode;
+    struct addrinfo *res_udp, *res_tcp;
     
     parseArguments(argc, argv, &GSIP, &GSPORT);
     //printf("ip: %s\t port: %s\n", GSIP, GSPORT);
 
     // UDP Socket
-    udp_fd = createUDPSocket(GSIP, GSPORT, &res);
+    udp_fd = createUDPSocket(GSIP, GSPORT, &res_udp);
+
+    // TCP Socket
+    tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp);
 
     // main loop
     while(1) {
@@ -331,25 +360,28 @@ int main(int argc, char *argv[]) {
         OPCODE = getCommand(command);
 
         switch (OPCODE) {
-            case 1:                                     // start command
-                startCommand(input, udp_fd, res, player);
+            // start
+            case 1:                                     
+                startCommand(input, udp_fd, res_udp, player);
                 break;
             case 2:
-                tryCommand(input, udp_fd, res, player, &trialCount);
+                tryCommand(input, udp_fd, res_udp, player, &trialCount);
                 break;
             case 3:
                 break;
             case 4:
                 break;
-            case 5:                                     // quit command
-                quitCommand(input, udp_fd, res, player, 0);
+            // quit
+            case 5:                                     
+                quitCommand(input, udp_fd, res_udp, player, 0);
                 break;
-            case 6:                                     // exit command
-                quitCommand(input, udp_fd, res, player, 1);
+            // exit   
+            case 6:                                     
+                quitCommand(input, udp_fd, res_udp, player, 1);
                 break;
-            // Debug command
+            // debug
             case 7:
-                debugCommand(input, udp_fd, res, player);
+                debugCommand(input, udp_fd, res_udp, player);
                 break;
             default:
                 fprintf(stderr, "[ERR]: WRONG FORMAT\n");
