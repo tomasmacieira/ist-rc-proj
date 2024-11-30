@@ -334,7 +334,7 @@ void debugCommand(char input[], int fd, struct addrinfo *res, char player[]) {
 
 void scoreboardCommand(int fd, struct addrinfo *res) {
     int n;
-    char MSG[] = "GSB\n";  // Scoreboard request message
+    char MSG[] = "SSB\n";  // Scoreboard request message
     char buffer[1024];     // Buffer to receive the response
     FILE *tempFile;        // Temporary file to store the received data
 
@@ -374,13 +374,18 @@ void scoreboardCommand(int fd, struct addrinfo *res) {
 
     // Parse and display the scoreboard
     rewind(tempFile); // Reset file pointer to the beginning
-    printf("\n--- SCOREBOARD ---\n");
-    int rank = 1;
-    while (fgets(buffer, sizeof(buffer), tempFile)) {
-        printf("%d. %s", rank++, buffer); // Display each line with a rank
-    }
-    printf("------------------\n");
+    char *line = strtok(buffer, "\n");
+    while (line != NULL) {
+        if (strstr(line, "TOP 10 SCORES") || strlen(line) == 0) {
+            line = strtok(NULL, "\n");
+            continue;
+        }
 
+        // Print cleaned line
+        printf("%s\n", line);
+
+        line = strtok(NULL, "\n");
+    }
     // Cleanup
     fclose(tempFile);
     close(fd);
