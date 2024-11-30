@@ -125,7 +125,7 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
     char C1[2], C2[2], C3[2], C4[2];
     char MSG[64];
     char buffer[128];
-
+    // printf("%d\n", *trialCount);
     memset(MSG, 0, sizeof(MSG));
     memset(buffer, 0, sizeof(buffer));
 
@@ -173,7 +173,7 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
     write(1,buffer,n);
 }
 
-void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
+void startCommand(char input[], int fd, struct addrinfo *res, char player[], int *trialCount) {
     
     ssize_t n;
     socklen_t addrlen;
@@ -185,7 +185,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[]) {
     char buffer[128];        
 
     sscanf(input, "%s %s %s", CMD, PLID, TIME);
-
+    *trialCount = 1;
     // Register PLID for future context
     strcpy(player, PLID); 
 
@@ -362,7 +362,7 @@ int main(int argc, char *argv[]) {
         switch (OPCODE) {
             // start
             case 1:                                     
-                startCommand(input, udp_fd, res_udp, player);
+                startCommand(input, udp_fd, res_udp, player, &trialCount);
                 break;
             case 2:
                 tryCommand(input, udp_fd, res_udp, player, &trialCount);
