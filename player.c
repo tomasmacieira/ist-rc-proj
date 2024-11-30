@@ -149,8 +149,6 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
         return;
     }
 
-    // Increment trial count
-    (*trialCount)++;
 
     // Receive the response
     addrlen = sizeof(addr);
@@ -169,6 +167,11 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
         n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
         if(n==-1) /*error*/ exit(1);
 
+    }
+    // Check the message content before incrementing the trial count
+    if (strcmp(buffer, "RTR DUP\n") != 0) {
+        // Increment trial count only if message is not "RTR DUP"
+        (*trialCount)++;
     }
     write(1,buffer,n);
 }
@@ -329,6 +332,61 @@ void debugCommand(char input[], int fd, struct addrinfo *res, char player[]) {
     write(1,buffer,n);
 }
 
+void scoreboardCommand(int fd, struct addrinfo *res) {
+    int n;
+    char MSG[] = "GSB\n";  // Scoreboard request message
+    char buffer[1024];     // Buffer to receive the response
+    FILE *tempFile;        // Temporary file to store the received data
+
+    // Connect to the server
+    if (connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
+        fprintf(stderr, "[ERR]: Failed to establish TCP connection with GS.\n");
+        return;
+    }
+
+    // Send the scoreboard request
+    n = write(fd, MSG, strlen(MSG));
+    if (n == -1) {
+        fprintf(stderr, "[ERR]: Failed to send SCOREBOARD request.\n");
+        close(fd);
+        return;
+    }
+
+    // Open a temporary file to store the incoming scoreboard data
+    tempFile = tmpfile();
+    if (!tempFile) {
+        fprintf(stderr, "[ERR]: Failed to create temporary file.\n");
+        close(fd);
+        return;
+    }
+
+    // Receive the scoreboard file data
+    while ((n = read(fd, buffer, sizeof(buffer))) > 0) {
+        fwrite(buffer, 1, n, tempFile);
+    }
+
+    if (n < 0) {
+        fprintf(stderr, "[ERR]: Failed to receive SCOREBOARD data.\n");
+        fclose(tempFile);
+        close(fd);
+        return;
+    }
+
+    // Parse and display the scoreboard
+    rewind(tempFile); // Reset file pointer to the beginning
+    printf("\n--- SCOREBOARD ---\n");
+    int rank = 1;
+    while (fgets(buffer, sizeof(buffer), tempFile)) {
+        printf("%d. %s", rank++, buffer); // Display each line with a rank
+    }
+    printf("------------------\n");
+
+    // Cleanup
+    fclose(tempFile);
+    close(fd);
+}
+
+
 int main(int argc, char *argv[]) {
     
     char *GSIP = NULL;
@@ -370,6 +428,9 @@ int main(int argc, char *argv[]) {
             case 3:
                 break;
             case 4:
+                scoreboardCommand(tcp_fd, res_tcp);
+                tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp);
+                break;
                 break;
             // quit
             case 5:                                     
