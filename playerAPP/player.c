@@ -1,39 +1,83 @@
-#include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <time.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <signal.h>
-#include <netdb.h>
-#include <sys/select.h>
+#include "player.h"
 
-#define DEFAULT_IP "127.0.0.1"
-#define DEFAULT_PORT "58015"
-#define DEFAULT_PLAYER "000000"
+int main(int argc, char *argv[]) {
+    
+    char *GSIP = NULL;
+    char *GSPORT = NULL;
+    
+    int OPCODE;
+    char line[128];
+    char input[128];
+    char player[] = DEFAULT_PLAYER;
+    int trialCount = 1;                                   // Initialize trial counter
+    int udp_fd, tcp_fd, errcode;
+    struct addrinfo *res_udp, *res_tcp;
+    
+    parseArguments(argc, argv, &GSIP, &GSPORT);
+    //printf("ip: %s\t port: %s\n", GSIP, GSPORT);
+
+    // UDP Socket
+    udp_fd = createUDPSocket(GSIP, GSPORT, &res_udp);
+
+
+    // main loop
+    while(1) {
+        fgets(line, sizeof(line), stdin);                 // read the line
+        strcpy(input, line);                              // keep the original input
+        char *command = strtok(line, " ");                // get the first word
+        command[strcspn(command, "\n")] = '\0';
+        tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp); // TCP Socket 
+        OPCODE = getCommand(command);
+
+        switch (OPCODE) {
+            // start
+            case 1:                                     
+                startCommand(input, udp_fd, res_udp, player, &trialCount);
+                break;
+            // try
+            case 2:
+                tryCommand(input, udp_fd, res_udp, player, &trialCount);
+                break;
+            // show trials
+            case 3:
+                showtrialsCommand(tcp_fd, res_tcp, player);
+                break;
+            /// scoreboard
+            case 4:
+                scoreboardCommand(tcp_fd, res_tcp);
+                break;
+            // quit
+            case 5:                                     
+                quitCommand(input, udp_fd, res_udp, player, 0);
+                break;
+            // exit   
+            case 6:                                     
+                quitCommand(input, udp_fd, res_udp, player, 1);
+                break;
+            // debug
+            case 7:
+                debugCommand(input, udp_fd, res_udp, player);
+                break;
+            default:
+                fprintf(stderr, "[ERR]: WRONG FORMAT\n");
+                break;
+        }
+    }
+}
 
 void parseArguments(int argc, char *argv[], char **GSIP, char **GSPORT) {
-    if (argc == 5) { // Both IP and Port specified
+    if (argc == 5) {                             // Both IP and Port specified
         *GSIP = argv[2];
         *GSPORT = argv[4];
     } else if (argc == 3) {
-        if (strcmp(argv[1], "-n") == 0) { // Port omitted
+        if (strcmp(argv[1], "-n") == 0) {        // Port omitted
             *GSIP = argv[2];
             *GSPORT = DEFAULT_PORT;
         } else if (strcmp(argv[1], "-p") == 0) { // IP omitted
             *GSIP = DEFAULT_IP;
             *GSPORT = argv[2];
         }
-    } else if (argc == 1) { // No arguments specified
+    } else if (argc == 1) {                      // No arguments specified
         *GSIP = DEFAULT_IP;
         *GSPORT = DEFAULT_PORT;
     } else {
@@ -46,7 +90,7 @@ int createUDPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res)
     int udp_fd, errcode;
     struct addrinfo hints;
     struct timeval timeout;
-    timeout.tv_sec = 2;     // 2 seconds
+    timeout.tv_sec = 2;                 // 2 seconds
     timeout.tv_usec = 0;
 
     // Create UDP socket
@@ -75,7 +119,7 @@ int createUDPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res)
         exit(EXIT_FAILURE);
     }
 
-    return udp_fd; // Return the socket file descriptor
+    return udp_fd;                      // Return the socket descriptor
 }
 
 int createTCPSocket(const char *GSIP, const char *GSPORT, struct addrinfo **res) {
@@ -138,6 +182,8 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
         fprintf(stderr, "[ERR]: Invalid code format. Each guess must be a single character.\n");
         return;
     }
+
+    //printf("PLID: %s\n", PLID);
 
     // Prepare the message including the trial number
     snprintf(MSG, sizeof(MSG), "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, *trialCount);
@@ -461,71 +507,3 @@ void showtrialsCommand(int fd, struct addrinfo *res, char player[]) {
     close(fd);
     close(fptr);
 }
-
-int main(int argc, char *argv[]) {
-    
-    char *GSIP = NULL;
-    char *GSPORT = NULL;
-    
-    int OPCODE;
-    char line[128];
-    char input[128];
-    char player[] = DEFAULT_PLAYER;
-    int trialCount = 1;                                   // Initialize trial counter
-    int udp_fd, tcp_fd, errcode;
-    struct addrinfo *res_udp, *res_tcp;
-    
-    parseArguments(argc, argv, &GSIP, &GSPORT);
-    //printf("ip: %s\t port: %s\n", GSIP, GSPORT);
-
-    // UDP Socket
-    udp_fd = createUDPSocket(GSIP, GSPORT, &res_udp);
-
-
-    // main loop
-    while(1) {
-        fgets(line, sizeof(line), stdin);                 // read the line
-        strcpy(input, line);                              // keep the original input
-        char *command = strtok(line, " ");                // get the first word
-        command[strcspn(command, "\n")] = '\0';
-        tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp); // TCP Socket 
-        OPCODE = getCommand(command);
-
-        switch (OPCODE) {
-            // start
-            case 1:                                     
-                startCommand(input, udp_fd, res_udp, player, &trialCount);
-                break;
-            // try
-            case 2:
-                tryCommand(input, udp_fd, res_udp, player, &trialCount);
-                break;
-            // show trials
-            case 3:
-                showtrialsCommand(tcp_fd, res_tcp, player);
-                break;
-            /// scoreboard
-            case 4:
-                scoreboardCommand(tcp_fd, res_tcp);
-                break;
-            // quit
-            case 5:                                     
-                quitCommand(input, udp_fd, res_udp, player, 0);
-                break;
-            // exit   
-            case 6:                                     
-                quitCommand(input, udp_fd, res_udp, player, 1);
-                break;
-            // debug
-            case 7:
-                debugCommand(input, udp_fd, res_udp, player);
-                break;
-            default:
-                fprintf(stderr, "[ERR]: WRONG FORMAT\n");
-                break;
-        }
-    }
-}
-
-
-//setsockopt
