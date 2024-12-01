@@ -19,6 +19,7 @@
 
 #define DEFAULT_IP "127.0.0.1"
 #define DEFAULT_PORT "58015"
+#define DEFAULT_PLAYER "000000"
 
 void parseArguments(int argc, char *argv[], char **GSIP, char **GSPORT) {
     if (argc == 5) { // Both IP and Port specified
@@ -230,7 +231,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     write(1,buffer,n);
 }
 
-void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[], int exitCommand) {
+void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int exitCommand) {
 
     ssize_t n;
     socklen_t addrlen;
@@ -245,10 +246,9 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char PLID[], int ex
     memset(MSG, 0, sizeof(MSG));
     memset(buffer, 0, sizeof(buffer));
 
-    //MSG[11] = '\n';
-    snprintf(MSG, sizeof(MSG), "QUT %s\n", PLID);
+    snprintf(MSG, sizeof(MSG), "QUT %s\n", player);
     
-    printf("%s", MSG);
+    //printf("%s", MSG);
     n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
     if(n==-1) /*error*/ exit(1);
 
@@ -333,10 +333,15 @@ void debugCommand(char input[], int fd, struct addrinfo *res, char player[]) {
 }
 
 void scoreboardCommand(int fd, struct addrinfo *res) {
-    int n;
-    char MSG[] = "SSB\n";  // Scoreboard request message
-    char buffer[1024];     // Buffer to receive the response
-    FILE *tempFile;        // Temporary file to store the received data
+    ssize_t n, bytesRead;
+    int i = 0, fptr;
+    char ch;
+    char MSG[] = "SSB\n";  
+    char buffer[1024], status[100], Fname[50];     
+
+    memset(buffer, 0, sizeof(buffer));
+    memset(status, 0, sizeof(status));
+    memset(Fname, 0, sizeof(Fname));
 
     // Connect to the server
     if (connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
@@ -352,46 +357,46 @@ void scoreboardCommand(int fd, struct addrinfo *res) {
         return;
     }
 
-    // Open a temporary file to store the incoming scoreboard data
-    tempFile = tmpfile();
-    if (!tempFile) {
-        fprintf(stderr, "[ERR]: Failed to create temporary file.\n");
-        close(fd);
-        return;
-    }
-
-    // Receive the scoreboard file data
-    while ((n = read(fd, buffer, sizeof(buffer))) > 0) {
-        fwrite(buffer, 1, n, tempFile);
-    }
-
-    if (n < 0) {
-        fprintf(stderr, "[ERR]: Failed to receive SCOREBOARD data.\n");
-        fclose(tempFile);
-        close(fd);
-        return;
-    }
-
-    // Parse and display the scoreboard
-    rewind(tempFile); // Reset file pointer to the beginning
-    char *line = strtok(buffer, "\n");
-    while (line != NULL) {
-        if (strstr(line, "TOP 10 SCORES") || strlen(line) == 0) {
-            line = strtok(NULL, "\n");
-            continue;
+    // Read status
+    // Read format: SSB status [Fname Fsize Fdata]
+    while ((n = read(fd, &ch, 1)) > 0) {            // Read one character at a time
+        if (i < sizeof(status)) {
+            status[i++] = ch;
+            bytesRead++;
         }
-
-        // Print cleaned line
-        printf("%s\n", line);
-
-        line = strtok(NULL, "\n");
+        if (ch == '\n') {                           // End of the first line
+            status[i++] = ch;
+            break;
+        }
     }
-    // Cleanup
-    fclose(tempFile);
+    if (n <= 0) {
+        fprintf(stderr, "[ERR]: Failed to read status.\n");
+        close(fd);
+        return;
+    }
+    write(1, status, bytesRead);
+    fflush(stdout); 
+
+    // Get the filename and filesize
+    sscanf(status, "%*s %*s %s\n", Fname);
+
+    bytesRead = read(fd, buffer, sizeof(buffer));
+
+    // Save the file
+    fptr = open(Fname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fptr < 0) {
+        fprintf(stderr, "[ERR]: Failed to create file %s.\n", Fname);
+        close(fptr);
+        close(fd);
+        return;
+    }
+    write(fptr, buffer, bytesRead);
+    close(fd);
+    close(fptr);
 }
 
 void showtrialsCommand(int fd, struct addrinfo *res, char player[]) {
-    int fptr, i;
+    int fptr, i = 0;
     char MSG[12], buffer[1024], status[100], Fname[32], RSP[5], ch;
     ssize_t Fsize, bytesRead = 0, totalBytes = 0, n;
 
@@ -457,7 +462,6 @@ void showtrialsCommand(int fd, struct addrinfo *res, char player[]) {
     close(fptr);
 }
 
-
 int main(int argc, char *argv[]) {
     
     char *GSIP = NULL;
@@ -466,7 +470,7 @@ int main(int argc, char *argv[]) {
     int OPCODE;
     char line[128];
     char input[128];
-    char player[7];
+    char player[] = DEFAULT_PLAYER;
     int trialCount = 1;                                   // Initialize trial counter
     int udp_fd, tcp_fd, errcode;
     struct addrinfo *res_udp, *res_tcp;
