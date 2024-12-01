@@ -388,7 +388,73 @@ void scoreboardCommand(int fd, struct addrinfo *res) {
     }
     // Cleanup
     fclose(tempFile);
+}
+
+void showtrialsCommand(int fd, struct addrinfo *res, char player[]) {
+    int fptr, i;
+    char MSG[12], buffer[1024], status[100], Fname[32], RSP[5], ch;
+    ssize_t Fsize, bytesRead = 0, totalBytes = 0, n;
+
+    memset(MSG, 0, sizeof(MSG));
+    memset(buffer, 0, sizeof(buffer));
+    memset(status, 0, sizeof(status));
+    memset(Fname, 0, sizeof(Fname));
+
+    snprintf(MSG, sizeof(MSG), "STR %s\n", player);
+
+    if (connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
+        fprintf(stderr, "[ERR]: Failed to establish TCP connection with GS.\n");
+        return;
+    }
+
+    n = write(fd, MSG, strlen(MSG));
+    if (n == -1) {
+        fprintf(stderr, "[ERR]: Failed to send SHOW TRIALS request.\n");
+        close(fd);
+        return;
+    }
+
+    // Read status
+    // Read format: RST status [Fname Fsize Fdata]
+    while ((n = read(fd, &ch, 1)) > 0) {            // Read one character at a time
+        if (i < sizeof(status)) {
+            status[i++] = ch;
+            bytesRead++;
+        }
+        if (ch == '\n') {                           // End of the first line
+            status[i++] = ch;
+            break;
+        }
+    }
+    if (n <= 0) {
+        fprintf(stderr, "[ERR]: Failed to read status.\n");
+        close(fd);
+        return;
+    }
+    write(1, status, bytesRead);
+
+    // Get the filename and filesize
+    sscanf(status, "%*s %s %s\n", RSP, Fname);
+
+    // No active or inactive games for this player
+    if (strcmp(RSP, "NOK") == 0) {
+        close(fd);
+        return;
+    }
+
+    bytesRead = read(fd, buffer, sizeof(buffer));
+
+    // Save the file
+    fptr = open(Fname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fptr < 0) {
+        fprintf(stderr, "[ERR]: Failed to create file %s.\n", Fname);
+        close(fptr);
+        close(fd);
+        return;
+    }
+    write(fptr, buffer, bytesRead);
     close(fd);
+    close(fptr);
 }
 
 
@@ -401,7 +467,7 @@ int main(int argc, char *argv[]) {
     char line[128];
     char input[128];
     char player[7];
-    int trialCount = 1;                                 // Initialize trial counter
+    int trialCount = 1;                                   // Initialize trial counter
     int udp_fd, tcp_fd, errcode;
     struct addrinfo *res_udp, *res_tcp;
     
@@ -411,15 +477,14 @@ int main(int argc, char *argv[]) {
     // UDP Socket
     udp_fd = createUDPSocket(GSIP, GSPORT, &res_udp);
 
-    // TCP Socket
-    tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp);
 
     // main loop
     while(1) {
-        fgets(line, sizeof(line), stdin);               // read the line
-        strcpy(input, line);                            // keep the original input
-        char *command = strtok(line, " ");              // get the first word
+        fgets(line, sizeof(line), stdin);                 // read the line
+        strcpy(input, line);                              // keep the original input
+        char *command = strtok(line, " ");                // get the first word
         command[strcspn(command, "\n")] = '\0';
+        tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp); // TCP Socket 
         OPCODE = getCommand(command);
 
         switch (OPCODE) {
@@ -427,15 +492,17 @@ int main(int argc, char *argv[]) {
             case 1:                                     
                 startCommand(input, udp_fd, res_udp, player, &trialCount);
                 break;
+            // try
             case 2:
                 tryCommand(input, udp_fd, res_udp, player, &trialCount);
                 break;
+            // show trials
             case 3:
+                showtrialsCommand(tcp_fd, res_tcp, player);
                 break;
+            /// scoreboard
             case 4:
                 scoreboardCommand(tcp_fd, res_tcp);
-                tcp_fd = createTCPSocket(GSIP, GSPORT, &res_tcp);
-                break;
                 break;
             // quit
             case 5:                                     
