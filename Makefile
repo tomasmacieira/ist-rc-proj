@@ -1,6 +1,6 @@
 CC = gcc
 
-SRC = playerAPP/player.c
+SRC = client/player.c
 
 all:
 	$(CC) $(SRC) -o player

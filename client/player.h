@@ -124,6 +124,11 @@ void scoreboardCommand(int fd, struct addrinfo *res);
  */
 void showtrialsCommand(int fd, struct addrinfo *res, char player[]);
 
+/**
+ * Recieves the status response from the server and prints the appropriate message.
+ *
+ * @param fd The server's response string.
+ */
 void analyseResponse(char response[]);
 
 #endif
