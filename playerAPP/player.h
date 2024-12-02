@@ -23,6 +23,7 @@
 #define DEFAULT_IP "127.0.0.1"
 #define DEFAULT_PORT "58015"
 #define DEFAULT_PLAYER "000000"
+#define MAX_ATTEMPTS 3
 
 /**
  * Parses the IP address and port from the command-line arguments.
@@ -122,5 +123,7 @@ void scoreboardCommand(int fd, struct addrinfo *res);
  * @param player The player's ID.
  */
 void showtrialsCommand(int fd, struct addrinfo *res, char player[]);
+
+void analyseResponse(char response[]);
 
 #endif
