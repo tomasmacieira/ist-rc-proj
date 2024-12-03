@@ -1,10 +1,12 @@
 CC = gcc
 
-SRC = client/player.c
+CLT = client/player.c
+SV = server/gs.c
 
 all:
-	$(CC) $(SRC) -o player
+	$(CC) $(CLT) -o player
+	$(CC) $(SV) -o gs
 
-# Clean up generated files
 clean:
 	rm -f player
+	rm -f gs
