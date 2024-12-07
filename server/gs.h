@@ -25,4 +25,8 @@
 
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT);
 
+int createUDPSocket(const char *GSPORT, struct addrinfo **res);
+
+int createTCPSocket(const char *GSPORT, struct addrinfo **res);
+
 #endif
