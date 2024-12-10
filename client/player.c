@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
     struct addrinfo *res_udp, *res_tcp;
     
     parseArguments(argc, argv, &GSIP, &GSPORT);
-    //printf("ip: %s\t port: %s\n", GSIP, GSPORT);
+    printf("ip: %s\t port: %s\n", GSIP, GSPORT);
 
     // UDP Socket
     udp_fd = createUDPSocket(GSIP, GSPORT, &res_udp);
@@ -246,6 +246,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     memset(MSG, 0, sizeof(MSG));
     memset(buffer, 0, sizeof(buffer));
 
+    /*
     // Player ID is a 6 digit number
     if (strlen(PLID) != 6 || strspn(PLID, "0123456789") != 6) {
         fprintf(stderr, "[ERR]: Invalid PLID: %s\nPLID must be a 6 digit number\n", PLID);
@@ -257,7 +258,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     if (play_time < 1 || play_time > 600) {
         fprintf(stderr, "[ERR]: Invalid time: %s\nTime must be a 3 digit number between 1 and 600\n", TIME);
         return;
-    }
+    }*/
 
     snprintf(MSG, sizeof(MSG), "SNG %s %s\n", PLID, TIME);
 
@@ -270,6 +271,10 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     n=recvfrom(fd,buffer,128,0, (struct sockaddr*)&addr, &addrlen);
     if(n==-1) {
         fprintf(stderr, "[ERR]: Couldn't recieve UDP response\n");
+        printf("Client expected response from: %s:%d\n",
+       inet_ntoa(addr.sin_addr),
+       ntohs(addr.sin_port));
+
         exit(EXIT_FAILURE);
     }
 
@@ -563,6 +568,10 @@ void analyseResponse(char response[]) {
     }
     if (strcmp(response, "RSG OK\n") == 0) {
         fprintf(stdout, "Game started!\n");
+        return;
+    }
+    if (strcmp(response, "RSG ERR\n") == 0) {
+        fprintf(stdout, "Invalid syntax\n");
         return;
     }
 

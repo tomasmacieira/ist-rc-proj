@@ -10,6 +10,10 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     char buffer[1024];
+    char input[128];
+
+    int colorCode[4];
+    char player[7] = DEFAULT_PLAYER;
 
     parseArguments(argc, argv, &verbose, &GSPORT);
 
@@ -58,7 +62,7 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "[ERR]: Error forking for UDP connection\n");
             } else if (pid == 0) {
                 // Child process: Handle UDP request
-                // HANDLE UDP REQUEST
+                handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
             }
             // Parent process continues to wait for connections
         }
@@ -83,6 +87,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
+    }
     // Cleanup
     close(udp_fd);
     close(tcp_fd);
@@ -90,7 +95,6 @@ int main(int argc, char *argv[]) {
     freeaddrinfo(res_tcp);
 
     return 0;
-    }
 }
 
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT) {
@@ -171,4 +175,105 @@ int createTCPSocket(const char *GSPORT, struct addrinfo **res) {
     }
 
     return tcp_fd;
+}
+
+void handleUDPrequest(char input[], int fd, int colorCode[], char player[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+
+    int OPCODE;
+    char CMD[4];
+
+    sscanf(input, "%s %*s\n", CMD);
+    OPCODE = parseCommand(CMD);
+
+    switch (OPCODE)
+    {
+    // start
+    case 1:
+        startCommand(input, fd, colorCode, player, client_addr, client_len, verbose);
+        break;
+    // try
+    case 2:
+        break;
+    // show trials
+    case 3:
+        break;
+    // scoreboard
+    case 4:
+        break;
+    // quit or exit
+    case 5:
+        break;
+    // debug
+    case 6:
+        break;
+    default:
+        break;
+    }
+
+}
+
+int parseCommand(char command[]) {
+    if (strcmp(command, "SNG") == 0)        { return 1;}      // Start new game
+    else if (strcmp(command, "TRY") == 0)   { return 2;}      // try
+    else if (strcmp(command, "STR") == 0)   { return 3;}      // show trials
+    else if (strcmp(command, "SSB") == 0)   { return 4;}      // scoreboard
+    else if (strcmp(command, "QUT") == 0)   { return 5;}      // quit or exit
+    else if (strcmp(command, "DBG") == 0)   { return 6;}      // debug
+    else { return 0;}
+}
+
+void startCommand(char input[], int fd, int colorCode[], char player[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+    char PLID[7];
+    char time[4];
+    char response[100];
+
+    sscanf(input, "SNG %s %s\n", PLID, time);
+
+    printf("%s\n", PLID);
+    printf("%s\n", time);
+    if (strlen(PLID) != 6 || strlen(time) != 3 || (atoi(time) < 1 || atoi(time) > 600)) {
+        printf("aaaa\n");
+        snprintf(response, sizeof(response), "RSG ERR\n");
+    } else if (strcmp(PLID, player) == 0) {
+        snprintf(response, sizeof(response), "RSG NOK\n");
+    } else {
+        chooseCode(colorCode);
+        snprintf(response, sizeof(response), "RSG OK\n");
+    }
+
+    if (verbose) {
+        printDescription(input, PLID, client_addr, client_len);
+    }
+
+    if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
+        perror("[ERR]: Couldn't send UDP response");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void chooseCode(int code[]) {
+    srand(time(NULL));
+    for (int i = 0; i < 4; i++) {
+        code[i] = (rand() % 6) + 1; 
+    }
+}
+
+void printDescription(char input[], char PLID[], struct sockaddr *client_addr, socklen_t client_len) {
+    char client_ip[INET_ADDRSTRLEN];
+
+    struct sockaddr_in *addr_in = (struct sockaddr_in *)client_addr;
+
+    // Get the IP address
+    inet_ntop(AF_INET, &addr_in->sin_addr, client_ip, sizeof(client_ip));
+
+    // Get the port number
+    int client_port = ntohs(addr_in->sin_port);
+
+    char CMD[4];
+    sscanf(input, "%s %*s", CMD);
+
+    printf("Received UDP request:\n");
+    printf(" - PLID: %s\n", PLID);
+    printf(" - Request Type: %s\n", CMD);
+    printf(" - From IP: %s, Port: %d\n", client_ip, client_port);
 }
