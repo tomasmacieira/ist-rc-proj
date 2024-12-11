@@ -14,8 +14,8 @@ int main(int argc, char *argv[]) {
 
     int colorCode[4];
 
-    player_t player;
-    strcpy(player.PLID, DEFAULT_PLAYER);
+    player_t *player;
+    strcpy(player->PLID, DEFAULT_PLAYER);
 
     parseArguments(argc, argv, &verbose, &GSPORT);
 
@@ -179,7 +179,7 @@ int createTCPSocket(const char *GSPORT, struct addrinfo **res) {
     return tcp_fd;
 }
 
-void handleUDPrequest(char input[], int fd, int colorCode[], struct player p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
 
     int OPCODE;
     char CMD[4];
@@ -224,7 +224,7 @@ int parseCommand(char command[]) {
     else { return 0;}
 }
 
-void startCommand(char input[], int fd, int colorCode[], struct player p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+void startCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
     char PLID[7];
     char time[4];
     char response[100];
@@ -235,13 +235,17 @@ void startCommand(char input[], int fd, int colorCode[], struct player p, struct
     printf("%s\n", time);
     if (strlen(PLID) != 6 || strlen(time) != 3 || (atoi(time) < 1 || atoi(time) > 600)) {
         snprintf(response, sizeof(response), "RSG ERR\n");
-    } else if (strcmp(PLID, p.PLID) == 0) {
+    } if (strcmp(PLID, p->PLID) == 0) {
         snprintf(response, sizeof(response), "RSG NOK\n");
     } else {
-        chooseCode(colorCode);
-        strcpy(p.PLID, PLID);
+        chooseCode(colorCode, p);
+        strcpy(p->PLID, PLID);
         snprintf(response, sizeof(response), "RSG OK\n");
+        printf("%s\n", p->code);
+        createGameFile(p, 'P', atoi(time));
     }
+
+    
 
     if (verbose) {
         printDescription(input, PLID, client_addr, client_len);
@@ -252,31 +256,91 @@ void startCommand(char input[], int fd, int colorCode[], struct player p, struct
         exit(EXIT_FAILURE);
     }
 
-    createGameFile(p);
-
 }
 
-void createGameFile(struct player p) {
+void createGameFile(struct player *p, char mode, int timeLimit) {
     char filepath[48];
     char dirname[48];
+    char date[20]; 
+    char hours[20];
+    char firstLine[128];
+    time_t fulltime;
+    struct tm *current_time;
 
-    snprintf(dirname, sizeof(dirname), "./server//games/%s", p.PLID);
+    time(&fulltime);
+
+    current_time = gmtime(&fulltime);
+
+    snprintf(date, sizeof(date), "%4d-%02d-%02d",
+             current_time->tm_year + 1900,
+             current_time->tm_mon + 1,
+             current_time->tm_mday);
+
+    snprintf(hours, sizeof(hours), "%02d:%02d:%02d",
+             current_time->tm_hour,
+             current_time->tm_min,
+             current_time->tm_sec);
+
+
+    snprintf(dirname, sizeof(dirname), "./server/games/%s", p->PLID);
     mkdir(dirname, 0755);
 
-    snprintf(filepath, sizeof(filepath), "./server/games/%s/GAME_%s.txt", p.PLID, p.PLID);
+    snprintf(filepath, sizeof(filepath), "./server/games/%s/GAME_%s.txt", p->PLID, p->PLID);
 
-    p.fd = open(filepath, O_WRONLY | O_CREAT | O_APPEND, 0644);
-    if (p.fd == -1) {
-        fprintf(stderr,"[ERR]: open failed\n");
+    p->fd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (p->fd == -1) {
+        fprintf(stderr, "[ERR]: open failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    snprintf(firstLine, sizeof(firstLine),
+             "%-6s %c %s %d %s %s %ld\n",
+             p->PLID,           // PLID
+             mode,              // mode (Play ou Debug)
+             p->code,           // secret code to win 
+             timeLimit,         // time to win
+             date,              // YYYY-MM-DD
+             hours,             // HH:MM:SS
+             fulltime);         // time when game started
+
+    if (write(p->fd, firstLine, strlen(firstLine)) == -1) {
+        fprintf(stderr, "[ERR]: write failed\n");
+        close(p->fd);
         exit(EXIT_FAILURE);
     }
 }
 
-void chooseCode(int code[]) {
+void chooseCode(int code[], struct player *p) {
     srand(time(NULL));
+
     for (int i = 0; i < 4; i++) {
-        code[i] = (rand() % 6) + 1; 
+        code[i] = (rand() % 6) + 1;  // Generate a number between 1 and 6
+
+        switch (code[i]) {
+            case R:
+                p->code[i] = 'R';
+                break;
+            case G:
+                p->code[i] = 'G';
+                break;
+            case B:
+                p->code[i] = 'B';
+                break;
+            case Y:
+                p->code[i] = 'Y';
+                break;
+            case O:
+                p->code[i] = 'O';
+                break;
+            case P:
+                p->code[i] = 'P';
+                break;
+        }
     }
+
+    p->code[4] = '\0';
+
+    printf("%s\n", p->code);
 }
 
 void printDescription(char input[], char PLID[], struct sockaddr *client_addr, socklen_t client_len) {
