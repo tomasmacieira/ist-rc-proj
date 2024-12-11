@@ -13,7 +13,9 @@ int main(int argc, char *argv[]) {
     char input[128];
 
     int colorCode[4];
-    char player[7] = DEFAULT_PLAYER;
+
+    player_t player;
+    strcpy(player.PLID, DEFAULT_PLAYER);
 
     parseArguments(argc, argv, &verbose, &GSPORT);
 
@@ -177,7 +179,7 @@ int createTCPSocket(const char *GSPORT, struct addrinfo **res) {
     return tcp_fd;
 }
 
-void handleUDPrequest(char input[], int fd, int colorCode[], char player[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+void handleUDPrequest(char input[], int fd, int colorCode[], struct player p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
 
     int OPCODE;
     char CMD[4];
@@ -189,7 +191,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], char player[], stru
     {
     // start
     case 1:
-        startCommand(input, fd, colorCode, player, client_addr, client_len, verbose);
+        startCommand(input, fd, colorCode, p, client_addr, client_len, verbose);
         break;
     // try
     case 2:
@@ -222,7 +224,7 @@ int parseCommand(char command[]) {
     else { return 0;}
 }
 
-void startCommand(char input[], int fd, int colorCode[], char player[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+void startCommand(char input[], int fd, int colorCode[], struct player p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
     char PLID[7];
     char time[4];
     char response[100];
@@ -232,12 +234,12 @@ void startCommand(char input[], int fd, int colorCode[], char player[], struct s
     printf("%s\n", PLID);
     printf("%s\n", time);
     if (strlen(PLID) != 6 || strlen(time) != 3 || (atoi(time) < 1 || atoi(time) > 600)) {
-        printf("aaaa\n");
         snprintf(response, sizeof(response), "RSG ERR\n");
-    } else if (strcmp(PLID, player) == 0) {
+    } else if (strcmp(PLID, p.PLID) == 0) {
         snprintf(response, sizeof(response), "RSG NOK\n");
     } else {
         chooseCode(colorCode);
+        strcpy(p.PLID, PLID);
         snprintf(response, sizeof(response), "RSG OK\n");
     }
 
@@ -246,7 +248,26 @@ void startCommand(char input[], int fd, int colorCode[], char player[], struct s
     }
 
     if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
-        perror("[ERR]: Couldn't send UDP response");
+        fprintf(stderr,"[ERR]: Couldn't send UDP response");
+        exit(EXIT_FAILURE);
+    }
+
+    createGameFile(p);
+
+}
+
+void createGameFile(struct player p) {
+    char filepath[48];
+    char dirname[48];
+
+    snprintf(dirname, sizeof(dirname), "./server//games/%s", p.PLID);
+    mkdir(dirname, 0755);
+
+    snprintf(filepath, sizeof(filepath), "./server/games/%s/GAME_%s.txt", p.PLID, p.PLID);
+
+    p.fd = open(filepath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (p.fd == -1) {
+        fprintf(stderr,"[ERR]: open failed\n");
         exit(EXIT_FAILURE);
     }
 }

@@ -272,9 +272,8 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     if(n==-1) {
         fprintf(stderr, "[ERR]: Couldn't recieve UDP response\n");
         printf("Client expected response from: %s:%d\n",
-       inet_ntoa(addr.sin_addr),
-       ntohs(addr.sin_port));
-
+        inet_ntoa(addr.sin_addr),
+        ntohs(addr.sin_port));
         exit(EXIT_FAILURE);
     }
 
