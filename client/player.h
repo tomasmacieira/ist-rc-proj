@@ -22,7 +22,7 @@
 
 #define DEFAULT_IP "127.0.0.1"
 #define DEFAULT_PORT "58015"
-#define DEFAULT_PLAYER "000000"
+#define DEFAULT_PLAYER "123456"
 #define MAX_ATTEMPTS 3
 
 /**

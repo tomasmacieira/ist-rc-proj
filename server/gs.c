@@ -14,10 +14,11 @@ int main(int argc, char *argv[]) {
 
     int colorCode[4];
 
-    player_t *player;
-    strcpy(player->PLID, DEFAULT_PLAYER);
-
     parseArguments(argc, argv, &verbose, &GSPORT);
+
+    player_t p;
+    strcpy(p.PLID, DEFAULT_PLAYER);
+    player_t *player = &p;
 
     printf("PORT: %s VERBOSE: %d\n", GSPORT, verbose);
 
@@ -44,9 +45,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "[ERR]: Select function failed\n");
             break;
         } else if (out_fds == 0) {
-            // Timeout occurred
             printf("Timeout occurred, no activity in 10 seconds.\n");
-            continue; // Restart loop
+            continue; 
         }
 
         // Check UDP socket
@@ -59,10 +59,10 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            pid_t pid = fork();
-            if (pid < 0) {
+            pid_t pid1 = fork();
+            if (pid1 < 0) {
                 fprintf(stderr, "[ERR]: Error forking for UDP connection\n");
-            } else if (pid == 0) {
+            } else if (pid1 == 0) {
                 // Child process: Handle UDP request
                 handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
             }
@@ -78,11 +78,11 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            pid_t pid = fork();
-            if (pid < 0) {
+            pid_t pid2 = fork();
+            if (pid2 < 0) {
                 perror("Error forking for TCP connection");
                 close(client_fd);
-            } else if (pid == 0) {
+            } else if (pid2 == 0) {
                 // Child process: Handle TCP connection
                 // HANDLE TCP
             close(client_fd); // Parent doesn't need the client socket
@@ -184,11 +184,10 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
     int OPCODE;
     char CMD[4];
     
+    printf("input: %s\n", input);
     sscanf(input, "%s %*s\n", CMD);
     OPCODE = parseCommand(CMD);
-
-    switch (OPCODE)
-    {
+    switch (OPCODE) {
     // start
     case 1:
         startCommand(input, fd, colorCode, p, client_addr, client_len, verbose);
@@ -247,8 +246,6 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
         createGameFile(p, 'P', atoi(time));
     }
 
-    
-
     if (verbose) {
         printDescription(input, PLID, client_addr, client_len);
     }
@@ -269,6 +266,7 @@ int checkColors(char C1, char C2, char C3, char C4) {
     }
     return 0; // All colors are valid
 }
+
 int checkKey(struct player *p, char C1, char C2, char C3, char C4) {
     if(p->code[0] == C1 && p->code[1] == C2 && p->code[2] == C3 && p->code[3] == C4){
         return 0;
@@ -282,14 +280,16 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     struct sockaddr_in addr;
     char CMD[4];
     char C1[2], C2[2], C3[2], C4[2];
+    char PLID[7];
     char response[100];
-    int *attempt;
+    int attempt;
     p->attempts++;
-    sscanf(input, "TRY %s %s %s %s %s %d\n", CMD, C1, C2, C3, C4, attempt);
-    printf("input: %s\n", input);
+    sscanf(input, "TRY %s %s %s %s %s %s %d\n", CMD, PLID, C1, C2, C3, C4, &attempt);
+
     if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
     }
+
     else if (p->attempts == 8) {
         if(!checkKey(p, C1[0], C2[0], C3[0], C4[0])){
             snprintf(response, sizeof(response), "RTR ENT\n");
@@ -344,9 +344,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         snprintf(response, sizeof(response), "RTR OK %d %d %d\n", p->attempts, nB, nW);
     }
 
-
-
-
     if (verbose) {
         printDescription(input, p->PLID, client_addr, client_len);
     }
@@ -355,7 +352,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         exit(EXIT_FAILURE);
     }
 }
-
 
 void createGameFile(struct player *p, char mode, int timeLimit) {
     char filepath[48];
@@ -409,7 +405,7 @@ void createGameFile(struct player *p, char mode, int timeLimit) {
     }
 }
 
-void chooseCode(int code[], struct player *p) {
+void chooseCode(int code[], struct player *p) { 
     srand(time(NULL));
 
     for (int i = 0; i < 4; i++) {
@@ -439,7 +435,6 @@ void chooseCode(int code[], struct player *p) {
 
     p->code[4] = '\0';
 
-    printf("%s\n", p->code);
 }
 
 void printDescription(char input[], char PLID[], struct sockaddr *client_addr, socklen_t client_len) {
