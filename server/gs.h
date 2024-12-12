@@ -36,6 +36,7 @@ typedef struct player {
     char PLID[7];
     int fd;
     char code[5];
+    int attempts;
 } player_t;
 
 
@@ -50,6 +51,8 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
 int parseCommand(char command[]);
 
 void startCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t , int verbose);
+
+void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
 void chooseCode(int colorCode[], struct player *p);
 

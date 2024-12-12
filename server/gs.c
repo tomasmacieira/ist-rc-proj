@@ -183,7 +183,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
 
     int OPCODE;
     char CMD[4];
-
+    
     sscanf(input, "%s %*s\n", CMD);
     OPCODE = parseCommand(CMD);
 
@@ -195,6 +195,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
         break;
     // try
     case 2:
+        tryCommand(input, fd, colorCode, p, client_addr, client_len, verbose);
         break;
     // show trials
     case 3:
@@ -240,6 +241,7 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
     } else {
         chooseCode(colorCode, p);
         strcpy(p->PLID, PLID);
+        p->attempts = 0;
         snprintf(response, sizeof(response), "RSG OK\n");
         printf("%s\n", p->code);
         createGameFile(p, 'P', atoi(time));
@@ -257,6 +259,103 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
     }
 
 }
+
+int checkColors(char C1, char C2, char C3, char C4) {
+    char validColors[] = "RGBYOP"; // Valid color codes
+    // Check each input against the valid colors
+    if (!strchr(validColors, C1) || !strchr(validColors, C2) || 
+        !strchr(validColors, C3) || !strchr(validColors, C4)) {
+        return 1; // Invalid color found
+    }
+    return 0; // All colors are valid
+}
+int checkKey(struct player *p, char C1, char C2, char C3, char C4) {
+    if(p->code[0] == C1 && p->code[1] == C2 && p->code[2] == C3 && p->code[3] == C4){
+        return 0;
+    }
+    return 1;
+}
+
+void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+    ssize_t n;
+    socklen_t addrlen;
+    struct sockaddr_in addr;
+    char CMD[4];
+    char C1[2], C2[2], C3[2], C4[2];
+    char response[100];
+    int *attempt;
+    p->attempts++;
+    sscanf(input, "TRY %s %s %s %s %s %d\n", CMD, C1, C2, C3, C4, attempt);
+    printf("input: %s\n", input);
+    if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
+        snprintf(response, sizeof(response), "RTR ERR\n");
+    }
+    else if (p->attempts == 8) {
+        if(!checkKey(p, C1[0], C2[0], C3[0], C4[0])){
+            snprintf(response, sizeof(response), "RTR ENT\n");
+        }
+    }
+    else {
+        int nB = 0, nW = 0;
+        for (int i = 0; i < 4; i++) {
+            int temp_nB = 0, temp_nW = 0;
+            if(C1[0] == p->code[i]){
+                if(i == 0){
+                    temp_nB++;
+                }
+                else {
+                    temp_nW++;
+                }
+            }
+            if(C2[0] == p->code[i]){
+                if(i == 1){
+                    temp_nB++;
+                    temp_nW = 0;
+                }
+                else {
+                    temp_nW++;
+                }
+            }
+            if(C3[0] == p->code[i]){
+                if(i == 2){
+                    temp_nB++;
+                    temp_nW = 0;
+                }
+                else {
+                    temp_nW++;
+                }
+            }
+            if(C4[0] == p->code[i]){
+                if(i == 3){
+                    temp_nB++;
+                    temp_nW = 0;
+                }
+                else{
+                    temp_nW++;
+                }
+            }
+            if(temp_nB != 0){
+                nB++;
+            }
+            else if(temp_nW != 0){
+                nW++;
+            }
+        }
+        snprintf(response, sizeof(response), "RTR OK %d %d %d\n", p->attempts, nB, nW);
+    }
+
+
+
+
+    if (verbose) {
+        printDescription(input, p->PLID, client_addr, client_len);
+    }
+    if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
+        fprintf(stderr,"[ERR]: Couldn't send UDP response");
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 void createGameFile(struct player *p, char mode, int timeLimit) {
     char filepath[48];
