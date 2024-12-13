@@ -224,8 +224,6 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
 
     sscanf(input, "SNG %s %s\n", PLID, time);
 
-    printf("%s\n", PLID);
-    printf("%s\n", time);
     if (strlen(PLID) != 6 || strlen(time) != 3 || (atoi(time) < 1 || atoi(time) > 600)) {
         snprintf(response, sizeof(response), "RSG ERR\n");
     } if (strcmp(PLID, p->PLID) == 0) {
@@ -280,6 +278,15 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     p->attempts++;
     sscanf(input, "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, &attempt);
 
+    memset(try, 0, sizeof(try));
+
+     // register try
+    strcpy(try, C1);
+    strcat(try, C2);
+    strcat(try, C3);
+    strcat(try, C4);
+
+
     if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
     }
@@ -288,6 +295,11 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         if(!checkKey(p, C1[0], C2[0], C3[0], C4[0])){
             snprintf(response, sizeof(response), "RTR ENT\n");
         }
+    }
+
+    else if (checkPreviousTries(p, try)) {
+        snprintf(response, sizeof(response), "RTR DUP\n");
+        p->attempts--;
     }
     else {
         for (int i = 0; i < 4; i++) {
@@ -335,15 +347,10 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
             }
         }
         snprintf(response, sizeof(response), "RTR OK %d %d %d\n", p->attempts, nB, nW);
+        strcpy(p->tries[p->attempts - 1], try);
+        writeTry(p, nB, nW);
     }
 
-    // register try
-    strcpy(try, C1);
-    strcat(try, C2);
-    strcat(try, C3);
-    strcat(try, C4);
-
-    strcpy(p->tries[p->attempts - 1], try);
 
     if (verbose) {
         printDescription(input, p->PLID, client_addr, client_len);
@@ -352,8 +359,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         fprintf(stderr,"[ERR]: Couldn't send UDP response");
         exit(EXIT_FAILURE);
     }
-
-    writeTry(p, nB, nW);
 }
 
 void createGameFile(struct player *p, char mode, int timeLimit) {
@@ -471,4 +476,11 @@ void writeTry(struct player *p, int nB, int nW) {
         close(p->fd);
         exit(EXIT_FAILURE);
     }
+}
+
+int checkPreviousTries(struct player *p, char try[]) {
+    for (int i = 0; i < MAX_TRIES; i++) {
+        if (strcmp(p->tries[i], try) == 0) return 1;
+    }
+    return 0;
 }

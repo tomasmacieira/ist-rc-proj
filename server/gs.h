@@ -65,4 +65,6 @@ void createGameFile(struct player *p, char mode, int timeLimit);
 
 void writeTry(struct player *, int nB, int nW);
 
+int checkPreviousTries(struct player *p, char try[]);
+
 #endif
