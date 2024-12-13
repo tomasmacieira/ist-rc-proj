@@ -24,6 +24,7 @@
 
 #define DEFAULT_PORT "58015"
 #define DEFAULT_PLAYER "123456"
+#define MAX_TRIES 8
 
 #define R 1
 #define G 2
@@ -33,10 +34,12 @@
 #define P 6
 
 typedef struct player {
+    time_t st;
     char PLID[7];
     int fd;
     char code[5];
     int attempts;
+    char tries[MAX_TRIES][5];
 } player_t;
 
 
@@ -59,5 +62,7 @@ void chooseCode(int colorCode[], struct player *p);
 void printDescription(char input[], char PLID[], struct sockaddr *client_addr, socklen_t);
 
 void createGameFile(struct player *p, char mode, int timeLimit);
+
+void writeTry(struct player *, int nB, int nW);
 
 #endif

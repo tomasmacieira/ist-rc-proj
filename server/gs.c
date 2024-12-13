@@ -59,14 +59,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            pid_t pid1 = fork();
-            if (pid1 < 0) {
-                fprintf(stderr, "[ERR]: Error forking for UDP connection\n");
-            } else if (pid1 == 0) {
-                // Child process: Handle UDP request
-                handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
-            }
-            // Parent process continues to wait for connections
+            handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
         }
 
         // Check TCP socket
@@ -78,11 +71,11 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            pid_t pid2 = fork();
-            if (pid2 < 0) {
+            pid_t pid = fork();
+            if (pid < 0) {
                 perror("Error forking for TCP connection");
                 close(client_fd);
-            } else if (pid2 == 0) {
+            } else if (pid == 0) {
                 // Child process: Handle TCP connection
                 // HANDLE TCP
             close(client_fd); // Parent doesn't need the client socket
@@ -278,13 +271,14 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     ssize_t n;
     socklen_t addrlen;
     struct sockaddr_in addr;
-    char CMD[4];
     char C1[2], C2[2], C3[2], C4[2];
     char PLID[7];
     char response[100];
+    char try[5];
     int attempt;
+    int nB = 0, nW = 0;
     p->attempts++;
-    sscanf(input, "TRY %s %s %s %s %s %s %d\n", CMD, PLID, C1, C2, C3, C4, &attempt);
+    sscanf(input, "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, &attempt);
 
     if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
@@ -296,7 +290,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         }
     }
     else {
-        int nB = 0, nW = 0;
         for (int i = 0; i < 4; i++) {
             int temp_nB = 0, temp_nW = 0;
             if(C1[0] == p->code[i]){
@@ -344,6 +337,14 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         snprintf(response, sizeof(response), "RTR OK %d %d %d\n", p->attempts, nB, nW);
     }
 
+    // register try
+    strcpy(try, C1);
+    strcat(try, C2);
+    strcat(try, C3);
+    strcat(try, C4);
+
+    strcpy(p->tries[p->attempts - 1], try);
+
     if (verbose) {
         printDescription(input, p->PLID, client_addr, client_len);
     }
@@ -351,6 +352,8 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         fprintf(stderr,"[ERR]: Couldn't send UDP response");
         exit(EXIT_FAILURE);
     }
+
+    writeTry(p, nB, nW);
 }
 
 void createGameFile(struct player *p, char mode, int timeLimit) {
@@ -363,6 +366,7 @@ void createGameFile(struct player *p, char mode, int timeLimit) {
     struct tm *current_time;
 
     time(&fulltime);
+    p->st = fulltime;
 
     current_time = gmtime(&fulltime);
 
@@ -455,4 +459,16 @@ void printDescription(char input[], char PLID[], struct sockaddr *client_addr, s
     printf(" - PLID: %s\n", PLID);
     printf(" - Request Type: %s\n", CMD);
     printf(" - From IP: %s, Port: %d\n", client_ip, client_port);
+}
+
+void writeTry(struct player *p, int nB, int nW) {
+    char line[64];
+
+    snprintf(line, sizeof(line), "T: %s %d %d %ld\n", p->tries[p->attempts - 1], nB, nW, p->st);
+
+    if (write(p->fd, line, strlen(line)) == -1) {
+        fprintf(stderr, "[ERR]: write failed\n");
+        close(p->fd);
+        exit(EXIT_FAILURE);
+    }
 }

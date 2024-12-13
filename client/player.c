@@ -218,7 +218,6 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
         attempts++;
 
     }
-    printf("%s", buffer);
     // Check the message content before incrementing the trial count (Acrescentar ERR)
     if (strncmp(buffer, "RTR DUP", 7) != 0 && strncmp(buffer, "RTR ERR", 7) != 0) {
         (*trialCount)++;
