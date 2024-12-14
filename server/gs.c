@@ -19,6 +19,7 @@ int main(int argc, char *argv[]) {
     player_t p;
     strcpy(p.PLID, DEFAULT_PLAYER);
     player_t *player = &p;
+    player->attempts = 0;
 
     printf("PORT: %s VERBOSE: %d\n", GSPORT, verbose);
 
@@ -277,7 +278,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     int nB = 0, nW = 0;
     p->attempts++;
     sscanf(input, "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, &attempt);
-
     memset(try, 0, sizeof(try));
 
      // register try
@@ -285,12 +285,12 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     strcat(try, C2);
     strcat(try, C3);
     strcat(try, C4);
-
-
     if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
     }
-
+    else if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
+        snprintf(response, sizeof(response), "RTR NOK\n");
+    }
     else if (p->attempts == 8) {
         if(!checkKey(p, C1[0], C2[0], C3[0], C4[0])){
             snprintf(response, sizeof(response), "RTR ENT\n");
