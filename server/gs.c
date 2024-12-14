@@ -291,6 +291,9 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     else if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
         snprintf(response, sizeof(response), "RTR NOK\n");
     }
+    else if(p->attempts != attempt && !(p->attempts - 1 == attempt && checkPreviousTry(p, try))){
+        snprintf(response, sizeof(response), "RTR INV\n");
+    }
     else if (p->attempts == 8) {
         if(!checkKey(p, C1[0], C2[0], C3[0], C4[0])){
             snprintf(response, sizeof(response), "RTR ENT\n");
@@ -482,5 +485,9 @@ int checkPreviousTries(struct player *p, char try[]) {
     for (int i = 0; i < MAX_TRIES; i++) {
         if (strcmp(p->tries[i], try) == 0) return 1;
     }
+    return 0;
+}
+int checkPreviousTry(struct player *p, char try[]) {
+    if (strcmp(p->tries[p->attempts - 2], try) == 0) return 1;
     return 0;
 }
