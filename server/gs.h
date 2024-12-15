@@ -36,7 +36,7 @@
 typedef struct player {
     time_t st;
     char PLID[7];
-    int fd;
+    int fd;             // game fd
     char code[5];
     int attempts;
     char tries[MAX_TRIES][5];
@@ -68,5 +68,11 @@ void writeTry(struct player *, int nB, int nW);
 int checkPreviousTries(struct player *p, char try[]);
 
 int checkPreviousTry(struct player *p, char try[]);
+
+void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
+
+int isCorrectPLID(char PLID[]);
+
+void endGame(player_t *player);
 
 #endif

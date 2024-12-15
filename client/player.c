@@ -309,8 +309,9 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int 
     memset(buffer, 0, sizeof(buffer));
 
     snprintf(MSG, sizeof(MSG), "QUT %s\n", player);
+    MSG[sizeof(MSG) - 1] = '\0';
     
-    //printf("%s", MSG);
+    printf("%s", MSG);
     n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
     if(n==-1) {
         fprintf(stderr, "[ERR]: Couldn't send UDP request\n");
@@ -557,6 +558,7 @@ void showtrialsCommand(int fd, struct addrinfo *res, char player[]) {
 void analyseResponse(char response[]) {
     char nT[2], nB[2], nW[2];
     char C1[2], C2[2], C3[2], C4[2];
+    char code[8];
     char Fname[50], Fsize[10];
 
     // Handle start request status 
@@ -581,70 +583,88 @@ void analyseResponse(char response[]) {
                 "Number of correct colors in the right position: %s\n"
                 "Number of correct colors in the wrong position: %s\n",
                 nT, nB, nW);
+        return;
     }
     if (strncmp(response, "RTR DUP", 7) == 0) {
         fprintf(stdout, "Duplicate try!\n");
+        return;
     }
     if (strncmp(response, "RTR INV", 7) == 0) {
         fprintf(stdout, "Trial number not expected\n");
+        return;
     } 
     if (strncmp(response, "RTR NOK", 7) == 0) {
         fprintf(stdout, "Current player does not have an active game!\n");
+        return;
     }
     if (strncmp(response, "RTR ENT", 7) == 0) {
         fprintf(stdout, "No more attempts left\n");
+        return;
     } 
     if (strncmp(response, "RTR ETM", 7) == 0) {
         fprintf(stdout, "No more time left to play!\n");
+        return;
     }
     if (strncmp(response, "RTR ERR", 7) == 0) {
         fprintf(stdout, "Wrong Syntax on try request\n");
+        return;
     }
 
     // handle quit and exit responses
     if (strncmp(response, "RQT OK ", 7) == 0) {
-        sscanf(response, "RQT OK %s %s %s %s\n", C1, C2, C3, C4);
-        fprintf(stdout, "Quiting game... Secret color code was: %s %s %s %s\n", C1, C2, C3, C4);
+        sscanf(response, "RQT OK %s\n", code);
+        fprintf(stdout, "Quiting game... Secret color code was: %s\n", code);
+        return;
     }
     if (strncmp(response, "RQT NOK", 7) == 0) {
         fprintf(stdout, "Current player does not have an active game\n");
+        return;
     }
     if (strncmp(response, "RQT ERR", 7) == 0) {
         fprintf(stdout, "Error\n");
+        return;
     }
 
 
     // handle debug responses
     if (strcmp(response, "RDB NOK\n") == 0) {
         fprintf(stdout, "Current player has an active game\n");
+        return;
     }
     if (strcmp(response, "RDB OK\n") == 0) {
         fprintf(stdout, "Debugging started... Using the secret color code provided\n");
+        return;
     }
     if (strcmp(response, "RDB ERR\n") == 0) {
         fprintf(stdout, "Wrong Syntax on debug request\n");
+        return;
     }
 
     // handle show trials responses
     if (strncmp(response, "RST ACT", 7) == 0) {
         sscanf(response, "RST ACT %s %s", Fname, Fsize);
         fprintf(stdout, "Downloading file %s with %s bytes, containing the most recent attempts\n", Fname, Fsize);
+        return;
     }
     if (strncmp(response, "RST FIN", 7) == 0) {
         fprintf(stdout, "Current player does not have an active game\n");
         sscanf(response, "RST FIN %s %s", Fname, Fsize);
         fprintf(stdout, "Downloading file %s with %s bytes, containing the summary of the most recent game\n", Fname, Fsize);
+        return;
     }
     if (strncmp(response, "RST NOK", 7) == 0) {
         fprintf(stdout, "Current player does not have any active or finished game\n");
+        return;
     }
 
     // handle scoreboard responses
     if (strncmp(response, "RSS OK", 6) == 0) {
         sscanf(response, "RSS OK %s %s", Fname, Fsize);
         fprintf(stdout, "Downloading file %s with %s bytes, containing the scoreboard\n", Fname, Fsize);
+        return;
     }
     if (strncmp(response, "RSS EMPTY", 9) == 0) {
         fprintf(stdout, "No game was yet won by any player\n");
+        return;
     }
 }

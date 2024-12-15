@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "[ERR]: Select function failed\n");
             break;
         } else if (out_fds == 0) {
-            printf("Timeout occurred, no activity in 10 seconds.\n");
+            fprintf(stderr, "Timeout occurred, no activity in 10 seconds.\n");
             continue; 
         }
 
@@ -198,6 +198,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
         break;
     // quit or exit
     case 5:
+        quitCommand(input, fd, p, client_addr, client_len, verbose);
         break;
     // debug
     case 6:
@@ -222,6 +223,7 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
     char PLID[7];
     char time[4];
     char response[100];
+    char code[5];
 
     sscanf(input, "SNG %s %s\n", PLID, time);
 
@@ -234,7 +236,6 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
         strcpy(p->PLID, PLID);
         p->attempts = 0;
         snprintf(response, sizeof(response), "RSG OK\n");
-        printf("%s\n", p->code);
         createGameFile(p, 'P', atoi(time));
     }
 
@@ -487,7 +488,52 @@ int checkPreviousTries(struct player *p, char try[]) {
     }
     return 0;
 }
+
 int checkPreviousTry(struct player *p, char try[]) {
     if (strcmp(p->tries[p->attempts - 2], try) == 0) return 1;
     return 0;
+}
+
+void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+    
+    char PLID[7];
+    char response[100];
+    char code[8];
+    char C1[2]; char C2[2]; char C3[2]; char C4[2];
+
+    sscanf(input, "QUT %s\n", PLID);
+
+    // check if PLID had ongoing game
+    if (p->attempts == 0 && isCorrectPLID(PLID)) { snprintf(response, sizeof(response), "RQT NOK\n");}
+    else if (p->attempts > 0 && isCorrectPLID(PLID)) { 
+        snprintf(response, sizeof(response), "RQT OK %s\n", p->code);
+        }
+    else { snprintf(response, sizeof(response), "RQT ERR\n");}
+
+    if (verbose) {
+        printDescription(input, PLID, client_addr, client_len);
+    }
+
+    if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
+        fprintf(stderr,"[ERR]: Couldn't send UDP response");
+        exit(EXIT_FAILURE);
+    }
+    
+    endGame(p);
+}
+
+int isCorrectPLID(char PLID[]) {
+    return strlen(PLID) == 6;
+}
+
+void endGame(player_t *player) {
+    if (player == NULL) {
+        return;
+    }
+    player->st = 0;
+    memset(player->PLID, 0, sizeof(player->PLID)); 
+    player->fd = -1;
+    memset(player->code, 0, sizeof(player->code)); 
+    player->attempts = 0;
+    memset(player->tries, 0, sizeof(player->tries));
 }
