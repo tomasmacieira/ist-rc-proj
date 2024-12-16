@@ -41,6 +41,7 @@ typedef struct player {
     char code[5];
     int attempts;
     char tries[MAX_TRIES][5];
+    int gameStatus;
 } player_t;
 
 

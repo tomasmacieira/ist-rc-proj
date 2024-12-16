@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
     strcpy(p.PLID, DEFAULT_PLAYER);
     player_t *player = &p;
     player->attempts = 0;
+    player->gameStatus = 0;
 
     printf("PORT: %s VERBOSE: %d\n", GSPORT, verbose);
 
@@ -238,6 +239,7 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
         p->attempts = 0;
         // Record the start time and max play time
         p->maxTime = atoi(gameTime);            // Max play time from input
+        p->gameStatus = 1;
         snprintf(response, sizeof(response), "RSG OK\n");
         createGameFile(p, 'P', atoi(gameTime));
     }
@@ -511,8 +513,8 @@ void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client
     sscanf(input, "QUT %s\n", PLID);
 
     // check if PLID had ongoing game
-    if (p->attempts == 0 && validPLID(PLID)) { snprintf(response, sizeof(response), "RQT NOK\n");}
-    else if (p->attempts > 0 && validPLID(PLID)) { 
+    if (!p->gameStatus && validPLID(PLID)) { snprintf(response, sizeof(response), "RQT NOK\n");}
+    else if (p->gameStatus && validPLID(PLID)) { 
         snprintf(response, sizeof(response), "RQT OK %s\n", p->code);
         }
     else { snprintf(response, sizeof(response), "RQT ERR\n");}
@@ -537,14 +539,20 @@ void endGame(player_t *player) {
     if (player == NULL) {
         return;
     }
+
+    // Clear the entire player structure
+    memset(player, 0, sizeof(player_t));
+
+    // Set specific default values
+    strncpy(player->PLID, DEFAULT_PLAYER, sizeof(player->PLID) - 1);  // Copy safely
+    player->PLID[sizeof(player->PLID) - 1] = '\0';                   // Ensure null termination
+    player->gameStatus = 0;
     player->startTime = 0;
     player->maxTime = 0;
-    memset(player->PLID, 0, sizeof(player->PLID)); 
     player->fd = -1;
-    memset(player->code, 0, sizeof(player->code)); 
     player->attempts = 0;
-    memset(player->tries, 0, sizeof(player->tries));
 }
+
 
 int validTime(char time[]) {
     return (strlen(time) == 3 && atoi(time) > 1 && atoi(time) < 600);
