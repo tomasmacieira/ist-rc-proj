@@ -202,6 +202,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
         break;
     // debug
     case 6:
+        debugCommand(input, fd, p, client_addr, client_len, verbose);
         break;
     default:
         break;
@@ -504,8 +505,8 @@ void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client
     sscanf(input, "QUT %s\n", PLID);
 
     // check if PLID had ongoing game
-    if (p->attempts == 0 && isCorrectPLID(PLID)) { snprintf(response, sizeof(response), "RQT NOK\n");}
-    else if (p->attempts > 0 && isCorrectPLID(PLID)) { 
+    if (p->attempts == 0 && validPLID(PLID)) { snprintf(response, sizeof(response), "RQT NOK\n");}
+    else if (p->attempts > 0 && validPLID(PLID)) { 
         snprintf(response, sizeof(response), "RQT OK %s\n", p->code);
         }
     else { snprintf(response, sizeof(response), "RQT ERR\n");}
@@ -522,7 +523,7 @@ void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client
     endGame(p);
 }
 
-int isCorrectPLID(char PLID[]) {
+int validPLID(char PLID[]) {
     return strlen(PLID) == 6;
 }
 
@@ -536,4 +537,43 @@ void endGame(player_t *player) {
     memset(player->code, 0, sizeof(player->code)); 
     player->attempts = 0;
     memset(player->tries, 0, sizeof(player->tries));
+}
+
+int validTime(char time[]) {
+    return (strlen(time) == 3 && atoi(time) > 1 && atoi(time) < 600);
+}
+
+void debugCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+
+    char CMD[4];
+    char PLID[7];
+    char time[4];
+    char code[8];
+    char response[100];
+
+    sscanf(input, "DBG %s %s %7s\n", PLID, time, code);
+
+    // check if player has active game
+    if (p->attempts > 0) { snprintf(response, sizeof(response), "RDB NOK\n");}
+
+    else if (validPLID(PLID) && validTime(time)) { 
+        strcpy(p->PLID, PLID);
+        strcpy(p->code, code);
+        p->attempts = 0;
+        snprintf(response, sizeof(response), "RDB OK\n");
+        createGameFile(p, 'D', atoi(time));
+    } 
+    else {
+        snprintf(response, sizeof(response), "RDB ERR\n");
+    }
+
+    if (verbose) {
+        printDescription(input, PLID, client_addr, client_len);
+    }
+
+    if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
+        fprintf(stderr,"[ERR]: Couldn't send UDP response");
+        exit(EXIT_FAILURE);
+    }
+
 }

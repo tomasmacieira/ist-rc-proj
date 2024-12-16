@@ -71,8 +71,12 @@ int checkPreviousTry(struct player *p, char try[]);
 
 void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
-int isCorrectPLID(char PLID[]);
+int validPLID(char PLID[]);
 
 void endGame(player_t *player);
+
+void debugCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
+
+int validTime(char time[]);
 
 #endif
