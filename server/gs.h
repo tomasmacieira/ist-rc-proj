@@ -34,7 +34,8 @@
 #define P 6
 
 typedef struct player {
-    time_t st;
+    time_t startTime;
+    time_t maxTime;
     char PLID[7];
     int fd;             // game fd
     char code[5];

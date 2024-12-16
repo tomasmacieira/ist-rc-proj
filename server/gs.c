@@ -222,13 +222,13 @@ int parseCommand(char command[]) {
 
 void startCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
     char PLID[7];
-    char time[4];
+    char gameTime[4];
     char response[100];
     char code[5];
 
-    sscanf(input, "SNG %s %s\n", PLID, time);
+    sscanf(input, "SNG %s %s\n", PLID, gameTime);
 
-    if (strlen(PLID) != 6 || strlen(time) != 3 || (atoi(time) < 1 || atoi(time) > 600)) {
+    if (strlen(PLID) != 6 || strlen(gameTime) != 3 || (atoi(gameTime) < 1 || atoi(gameTime) > 600)) {
         snprintf(response, sizeof(response), "RSG ERR\n");
     } if (strcmp(PLID, p->PLID) == 0) {
         snprintf(response, sizeof(response), "RSG NOK\n");
@@ -236,8 +236,10 @@ void startCommand(char input[], int fd, int colorCode[], struct player *p, struc
         chooseCode(colorCode, p);
         strcpy(p->PLID, PLID);
         p->attempts = 0;
+        // Record the start time and max play time
+        p->maxTime = atoi(gameTime);            // Max play time from input
         snprintf(response, sizeof(response), "RSG OK\n");
-        createGameFile(p, 'P', atoi(time));
+        createGameFile(p, 'P', atoi(gameTime));
     }
 
     if (verbose) {
@@ -278,16 +280,20 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     char try[5];
     int attempt;
     int nB = 0, nW = 0;
+    time_t currentTime = time(NULL);
     p->attempts++;
     sscanf(input, "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, &attempt);
     memset(try, 0, sizeof(try));
-
      // register try
     strcpy(try, C1);
     strcat(try, C2);
     strcat(try, C3);
     strcat(try, C4);
-    if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
+    if (difftime(currentTime, p->startTime) > p->maxTime) {
+        snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
+        printf("response:%s",response);
+    }
+    else if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
     }
     else if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
@@ -376,7 +382,7 @@ void createGameFile(struct player *p, char mode, int timeLimit) {
     struct tm *current_time;
 
     time(&fulltime);
-    p->st = fulltime;
+    p->startTime = fulltime;
 
     current_time = gmtime(&fulltime);
 
@@ -474,7 +480,7 @@ void printDescription(char input[], char PLID[], struct sockaddr *client_addr, s
 void writeTry(struct player *p, int nB, int nW) {
     char line[64];
 
-    snprintf(line, sizeof(line), "T: %s %d %d %ld\n", p->tries[p->attempts - 1], nB, nW, p->st);
+    snprintf(line, sizeof(line), "T: %s %d %d %ld\n", p->tries[p->attempts - 1], nB, nW, p->startTime);
 
     if (write(p->fd, line, strlen(line)) == -1) {
         fprintf(stderr, "[ERR]: write failed\n");
@@ -531,7 +537,8 @@ void endGame(player_t *player) {
     if (player == NULL) {
         return;
     }
-    player->st = 0;
+    player->startTime = 0;
+    player->maxTime = 0;
     memset(player->PLID, 0, sizeof(player->PLID)); 
     player->fd = -1;
     memset(player->code, 0, sizeof(player->code)); 
