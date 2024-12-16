@@ -263,8 +263,8 @@ int checkColors(char C1, char C2, char C3, char C4) {
     return 0; // All colors are valid
 }
 
-int checkKey(struct player *p, char C1, char C2, char C3, char C4) {
-    if(p->code[0] == C1 && p->code[1] == C2 && p->code[2] == C3 && p->code[3] == C4){
+int checkKey(struct player *p, char* C1, char* C2, char* C3, char* C4) {
+    if(p->code[0] == C1[0] && p->code[1] == C2[0] && p->code[2] == C3[0] && p->code[3] == C4[0]){
         return 0;
     }
     return 1;
@@ -291,7 +291,7 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     strcat(try, C4);
     if (difftime(currentTime, p->startTime) > p->maxTime) {
         snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
-        printf("response:%s",response);
+        quitCommand(input, fd, p, client_addr, client_len, verbose);
     }
     else if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
@@ -302,12 +302,12 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     else if(p->attempts != attempt && !(p->attempts - 1 == attempt && checkPreviousTry(p, try))){
         snprintf(response, sizeof(response), "RTR INV\n");
     }
-    else if (p->attempts == 8) {
-        if(!checkKey(p, C1[0], C2[0], C3[0], C4[0])){
+    else if (p->attempts >= 8) {
+        if(checkKey(p, C1, C2, C3, C4)){
             snprintf(response, sizeof(response), "RTR ENT\n");
         }
+        endGame(p);
     }
-
     else if (checkPreviousTries(p, try)) {
         snprintf(response, sizeof(response), "RTR DUP\n");
         p->attempts--;
