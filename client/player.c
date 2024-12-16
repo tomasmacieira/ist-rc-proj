@@ -604,7 +604,7 @@ void analyseResponse(char response[]) {
 if (strncmp(response, "RTR ETM", 7) == 0) {
         // Extract the secret key from the response
         sscanf(response, "RTR ETM %s %s %s %s\n", C1, C2, C3, C4);
-        fprintf(stdout, "No more time left to play! Correct key: %s %s %s %s\n", C1, C2, C3, C4);
+        fprintf(stdout, "No more time left to play! Secret color code was: %s %s %s %s\n", C1, C2, C3, C4);
         return;
     }
     if (strncmp(response, "RTR ERR", 7) == 0) {
