@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
                 break;
             // debug
             case 7:
-                debugCommand(input, udp_fd, res_udp, player);
+                debugCommand(input, udp_fd, res_udp, player, &trialCount);
                 break;
             default:
                 fprintf(stderr, "[ERR]: WRONG FORMAT\n");
@@ -349,7 +349,7 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int 
     }
 }
 
-void debugCommand(char input[], int fd, struct addrinfo *res, char player[]) {
+void debugCommand(char input[], int fd, struct addrinfo *res, char player[], int *trialCount) {
        
     ssize_t n;
     socklen_t addrlen;
@@ -389,6 +389,7 @@ void debugCommand(char input[], int fd, struct addrinfo *res, char player[]) {
 
     // Prepare the message including the trial number
     snprintf(MSG, sizeof(MSG), "DBG %s %s %s %s %s %s\n", PLID, TIME, C1, C2, C3, C4);
+    *trialCount = 1;
 
     n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
     if(n==-1) {
@@ -565,7 +566,7 @@ void analyseResponse(char response[]) {
         return;
     }
     if (strcmp(response, "RSG OK\n") == 0) {
-        fprintf(stdout, "Game started!\n");
+        fprintf(stdout, "Game started! You have 8 tries and the following plays: R,G,B,Y,O and P\n");
         return;
     }
     if (strcmp(response, "RSG ERR\n") == 0) {
@@ -576,6 +577,13 @@ void analyseResponse(char response[]) {
     // Handle try request status
     if (strncmp(response, "RTR OK ", 7) == 0) {
         sscanf(response, "RTR OK %s %s %s\n", nT, nB, nW);
+        
+        // Player won
+        if (strcmp(nB, "4") == 0) {
+            fprintf(stdout, "Game won, you guessed the right code!\n");
+            return;
+        }
+
         fprintf(stdout, 
                 "####### Try number %s #####\n"
                 "Number of correct colors in the right position: %s\n"
@@ -599,7 +607,7 @@ void analyseResponse(char response[]) {
         fprintf(stdout, "No more attempts left\n");
         return;
     } 
-if (strncmp(response, "RTR ETM", 7) == 0) {
+    if (strncmp(response, "RTR ETM", 7) == 0) {
         // Extract the secret key from the response
         sscanf(response, "RTR ETM %s %s %s %s\n", C1, C2, C3, C4);
         fprintf(stdout, "No more time left to play! Secret color code was: %s %s %s %s\n", C1, C2, C3, C4);

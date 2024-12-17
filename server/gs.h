@@ -23,7 +23,7 @@
 #include <sys/select.h>
 
 #define DEFAULT_PORT "58015"
-#define DEFAULT_PLAYER "123456"
+#define DEFAULT_PLAYER "999999"
 #define MAX_TRIES 8
 
 #define R 1

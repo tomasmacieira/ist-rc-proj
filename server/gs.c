@@ -179,7 +179,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
     int OPCODE;
     char CMD[4];
     
-    printf("input: %s\n", input);
+    printf("input: %s", input);
     sscanf(input, "%s %*s\n", CMD);
     OPCODE = parseCommand(CMD);
     switch (OPCODE) {
@@ -291,6 +291,7 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     strcat(try, C2);
     strcat(try, C3);
     strcat(try, C4);
+
     if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
         snprintf(response, sizeof(response), "RTR NOK\n");
     }
@@ -301,9 +302,11 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
         endGame(p);
     }
+
     else if(p->attempts != attempt && !(p->attempts - 1 == attempt && checkPreviousTry(p, try))){
         snprintf(response, sizeof(response), "RTR INV\n");
     }
+
     else if (p->attempts >= 8) {
         if(checkKey(p, C1, C2, C3, C4)){
             snprintf(response, sizeof(response), "RTR ENT\n");
@@ -315,6 +318,8 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         p->attempts--;
     }
     else {
+        printf("correct code is: %s\n", p->code);
+        printf("played code was %s\n", try);
         for (int i = 0; i < 4; i++) {
             int temp_nB = 0, temp_nW = 0;
             if(C1[0] == p->code[i]){
@@ -518,7 +523,20 @@ void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client
     // check if PLID had ongoing game
     if (!p->gameStatus && validPLID(PLID)) { snprintf(response, sizeof(response), "RQT NOK\n");}
     else if (p->gameStatus && validPLID(PLID)) { 
-        snprintf(response, sizeof(response), "RQT OK %s\n", p->code);
+
+        C1[0] = p->code[0];
+        C1[1] = '\0';  
+
+        C2[0] = p->code[1];
+        C2[1] = '\0';
+
+        C3[0] = p->code[2];
+        C3[1] = '\0';
+
+        C4[0] = p->code[3];
+        C4[1] = '\0';
+
+        snprintf(response, sizeof(response), "RQT OK %s %s %s %s\n", C1, C2, C3, C4);
         }
     else { snprintf(response, sizeof(response), "RQT ERR\n");}
 
@@ -547,15 +565,14 @@ void endGame(player_t *player) {
     memset(player, 0, sizeof(player_t));
 
     // Set specific default values
-    strncpy(player->PLID, DEFAULT_PLAYER, sizeof(player->PLID) - 1);  // Copy safely
-    player->PLID[sizeof(player->PLID) - 1] = '\0';                   // Ensure null termination
+    strncpy(player->PLID, DEFAULT_PLAYER, sizeof(player->PLID) - 1);  
+    player->PLID[sizeof(player->PLID) - 1] = '\0';                    // null termination
     player->gameStatus = 0;
     player->startTime = 0;
     player->maxTime = 0;
     player->fd = -1;
     player->attempts = 0;
 }
-
 
 int validTime(char time[]) {
     return (strlen(time) == 3 && atoi(time) > 1 && atoi(time) < 600);
@@ -575,12 +592,20 @@ void debugCommand(char input[], int fd, struct player *p, struct sockaddr *clien
     if (p->attempts > 0) { snprintf(response, sizeof(response), "RDB NOK\n");}
 
     else if (validPLID(PLID) && validTime(time)) { 
-        strcpy(p->PLID, PLID);    
-        p->code[0] = C1[0];
-        p->code[1] = C1[0];
-        p->code[2] = C1[0];
-        p->code[3] = C1[0];
+
+        // reset player stats
+        endGame(p);
+        strcpy(p->PLID, PLID);
+        p->maxTime = atoi(time);
         p->attempts = 0;
+
+
+        p->code[0] = C1[0];
+        p->code[1] = C2[0];
+        p->code[2] = C3[0];
+        p->code[3] = C4[0];
+        p->code[4] = '\0';
+
         p->gameStatus = 1;
         snprintf(response, sizeof(response), "RDB OK\n");
         createGameFile(p, 'D', atoi(time));

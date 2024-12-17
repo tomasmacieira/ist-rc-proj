@@ -22,7 +22,7 @@
 
 #define DEFAULT_IP "127.0.0.1"
 #define DEFAULT_PORT "58015"
-#define DEFAULT_PLAYER "123456"
+#define DEFAULT_PLAYER "999999"
 #define MAX_ATTEMPTS 3
 
 /**
@@ -105,7 +105,7 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int 
  * @param res The address information for the server.
  * @param player The player's ID.
  */
-void debugCommand(char input[], int fd, struct addrinfo *res, char player[]);
+void debugCommand(char input[], int fd, struct addrinfo *res, char player[], int *trialCount);
 
 /**
  * Sends a "scoreboard" command to retrieve the scoreboard and saves the response to a file.
