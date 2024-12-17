@@ -489,7 +489,7 @@ void printDescription(char input[], char PLID[], struct sockaddr *client_addr, s
 void writeTry(struct player *p, int nB, int nW) {
     char line[64];
 
-    snprintf(line, sizeof(line), "T: %s %d %d %ld\n", p->tries[p->attempts - 1], nB, nW, p->startTime);
+    snprintf(line, sizeof(line), "Trial: %s nB: %d nW: %d  %ds\n", p->tries[p->attempts - 1], nB, nW, (int)difftime(time(NULL), p->startTime));
 
     if (write(p->fd, line, strlen(line)) == -1) {
         fprintf(stderr, "[ERR]: write failed\n");
