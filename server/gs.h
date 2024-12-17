@@ -46,6 +46,7 @@ typedef struct player {
 
 void showtrialsCommand(int client_fd, struct player *p, int verbose);
 
+void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose);
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT);
 
 int createUDPSocket(const char *GSPORT, struct addrinfo **res);

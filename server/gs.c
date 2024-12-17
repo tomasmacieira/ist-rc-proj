@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
                 close(client_fd);
             } else if (pid == 0) {
                 // Child process: Handle TCP connection
-                handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
+                handleTCPrequest(client_fd, colorCode, player, verbose);
             close(client_fd); // Parent doesn't need the client socket
             }
         }
@@ -193,7 +193,6 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
         break;
     // show trials
     case 3:
-        showtrialsCommand(fd, p, verbose);
         break;
     // scoreboard
     case 4:
@@ -210,6 +209,42 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
         break;
     }
 
+}
+void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose) {
+    char input[1024], command[4];
+    int OPCODE;
+    ssize_t bytesRead;
+
+    memset(input, 0, sizeof(input));
+    memset(command, 0, sizeof(command));
+
+    // Read the command from the client
+    bytesRead = read(client_fd, input, sizeof(input) - 1);
+    if (bytesRead <= 0) {
+        perror("[ERR]: Failed to read from TCP client");
+        close(client_fd);
+        return;
+    }
+
+    // Parse the command
+    sscanf(input, "%s %*s\n", command);
+    OPCODE = parseCommand(command);
+
+    switch (OPCODE) {
+    // Show trials
+    case 3:
+        showtrialsCommand(client_fd, p, verbose);
+        break;
+    // Scoreboard
+    case 4:
+        break;
+    default:
+        // Handle unknown commands
+        fprintf(stderr, "[ERR]: Unknown TCP command received: %s\n", command);
+        const char *errorResponse = "ERR Unknown command\n";
+        write(client_fd, errorResponse, strlen(errorResponse));
+        break;
+    }
 }
 
 int parseCommand(char command[]) {
@@ -278,11 +313,17 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
     ssize_t bytesWritten, bytesRead;
     int trialFile;
     off_t fileSize;
+    const char *status;
+    if(p->gameStatus){
+        status = "ACT";
+    }
+    else{
+        status = "FIN";
+    }
 
     // Prepare file path: games/PLID/GAME_PLID.txt
+    snprintf(fullPath, sizeof(fullPath), "server/games/%s/GAME_%s.txt", p->PLID, p->PLID);
     snprintf(Fname, sizeof(Fname), "GAME_%s.txt", p->PLID);
-    snprintf(fullPath, sizeof(fullPath), "games/%s/%s", p->PLID, Fname);
-
     // Attempt to open the file
     trialFile = open(fullPath, O_RDONLY);
     if (trialFile < 0) {
@@ -298,10 +339,16 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
 
     // Get file size
     fileSize = lseek(trialFile, 0, SEEK_END);
+    if (fileSize == -1) {
+        perror("[ERR]: Failed to determine file size");
+        close(trialFile);
+        close(client_fd);
+        return;
+    }
     lseek(trialFile, 0, SEEK_SET);
 
-    // Send response header with status, file name, and file size
-    snprintf(response, sizeof(response), "RST OK %s %ld\n", Fname, fileSize);
+// Send response header with status, file name, and file size
+    snprintf(response, sizeof(response), "RST %s %s %ld\n", status, Fname, fileSize);
     bytesWritten = write(client_fd, response, strlen(response));
     if (bytesWritten < 0) {
         fprintf(stderr, "[ERR]: Failed to send response header to client.\n");
@@ -480,14 +527,14 @@ void createGameFile(struct player *p, char mode, int timeLimit) {
     }
 
     snprintf(firstLine, sizeof(firstLine),
-             "%-6s %c %s %d %s %s %ld\n",
+             "%-6s %c %s %d %s %s %lds\n",
              p->PLID,           // PLID
              mode,              // mode (Play ou Debug)
              p->code,           // secret code to win 
              timeLimit,         // time to win
              date,              // YYYY-MM-DD
              hours,             // HH:MM:SS
-             fulltime);         // time when game started
+             p->maxTime);         // time when game started
 
     if (write(p->fd, firstLine, strlen(firstLine)) == -1) {
         fprintf(stderr, "[ERR]: write failed\n");
