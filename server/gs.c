@@ -291,15 +291,15 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     strcat(try, C2);
     strcat(try, C3);
     strcat(try, C4);
-    if (difftime(currentTime, p->startTime) > p->maxTime) {
-        snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
-        quitCommand(input, fd, p, client_addr, client_len, verbose);
+    if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
+        snprintf(response, sizeof(response), "RTR NOK\n");
     }
     else if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
     }
-    else if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
-        snprintf(response, sizeof(response), "RTR NOK\n");
+    else if(difftime(currentTime, p->startTime) > p->maxTime) {
+        snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
+        endGame(p);
     }
     else if(p->attempts != attempt && !(p->attempts - 1 == attempt && checkPreviousTry(p, try))){
         snprintf(response, sizeof(response), "RTR INV\n");
@@ -362,6 +362,9 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         snprintf(response, sizeof(response), "RTR OK %d %d %d\n", p->attempts, nB, nW);
         strcpy(p->tries[p->attempts - 1], try);
         writeTry(p, nB, nW);
+        if(nB == 4){
+            endGame(p);
+        }
     }
 
 
@@ -578,6 +581,7 @@ void debugCommand(char input[], int fd, struct player *p, struct sockaddr *clien
         p->code[2] = C1[0];
         p->code[3] = C1[0];
         p->attempts = 0;
+        p->gameStatus = 1;
         snprintf(response, sizeof(response), "RDB OK\n");
         createGameFile(p, 'D', atoi(time));
     } 
