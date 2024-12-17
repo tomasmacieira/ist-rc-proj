@@ -179,7 +179,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
     int OPCODE;
     char CMD[4];
     
-    printf("input: %s", input);
+    //printf("input: %s", input);
     sscanf(input, "%s %*s\n", CMD);
     OPCODE = parseCommand(CMD);
     switch (OPCODE) {
@@ -292,6 +292,7 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
     strcat(try, C3);
     strcat(try, C4);
 
+
     if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
         snprintf(response, sizeof(response), "RTR NOK\n");
     }
@@ -307,7 +308,7 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         snprintf(response, sizeof(response), "RTR INV\n");
     }
 
-    else if (p->attempts >= 8) {
+    else if (p->attempts > 8) {
         if(checkKey(p, C1, C2, C3, C4)){
             snprintf(response, sizeof(response), "RTR ENT\n");
         }
@@ -318,8 +319,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         p->attempts--;
     }
     else {
-        printf("correct code is: %s\n", p->code);
-        printf("played code was %s\n", try);
         for (int i = 0; i < 4; i++) {
             int temp_nB = 0, temp_nW = 0;
             if(C1[0] == p->code[i]){
@@ -536,6 +535,8 @@ void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client
         C4[0] = p->code[3];
         C4[1] = '\0';
 
+        endGame(p);
+
         snprintf(response, sizeof(response), "RQT OK %s %s %s %s\n", C1, C2, C3, C4);
         }
     else { snprintf(response, sizeof(response), "RQT ERR\n");}
@@ -575,7 +576,7 @@ void endGame(player_t *player) {
 }
 
 int validTime(char time[]) {
-    return (strlen(time) == 3 && atoi(time) > 1 && atoi(time) < 600);
+    return (strlen(time) == 3 && atoi(time) >= 1 && atoi(time) <= 600);
 }
 
 void debugCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
