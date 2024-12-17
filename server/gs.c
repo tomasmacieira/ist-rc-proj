@@ -563,17 +563,20 @@ void debugCommand(char input[], int fd, struct player *p, struct sockaddr *clien
     char CMD[4];
     char PLID[7];
     char time[4];
-    char code[8];
+    char C1[2], C2[2], C3[2], C4[2];
     char response[100];
 
-    sscanf(input, "DBG %s %s %7s\n", PLID, time, code);
+    sscanf(input, "DBG %s %s %s %s %s %s\n", PLID, time, C1, C2, C3, C4);
 
     // check if player has active game
     if (p->attempts > 0) { snprintf(response, sizeof(response), "RDB NOK\n");}
 
     else if (validPLID(PLID) && validTime(time)) { 
-        strcpy(p->PLID, PLID);
-        strcpy(p->code, code);
+        strcpy(p->PLID, PLID);    
+        p->code[0] = C1[0];
+        p->code[1] = C1[0];
+        p->code[2] = C1[0];
+        p->code[3] = C1[0];
         p->attempts = 0;
         snprintf(response, sizeof(response), "RDB OK\n");
         createGameFile(p, 'D', atoi(time));
