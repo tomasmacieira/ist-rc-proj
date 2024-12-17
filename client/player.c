@@ -245,7 +245,6 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     memset(MSG, 0, sizeof(MSG));
     memset(buffer, 0, sizeof(buffer));
 
-    /*
     // Player ID is a 6 digit number
     if (strlen(PLID) != 6 || strspn(PLID, "0123456789") != 6) {
         fprintf(stderr, "[ERR]: Invalid PLID: %s\nPLID must be a 6 digit number\n", PLID);
@@ -257,7 +256,7 @@ void startCommand(char input[], int fd, struct addrinfo *res, char player[], int
     if (play_time < 1 || play_time > 600) {
         fprintf(stderr, "[ERR]: Invalid time: %s\nTime must be a 3 digit number between 1 and 600\n", TIME);
         return;
-    }*/
+    }
 
     snprintf(MSG, sizeof(MSG), "SNG %s %s\n", PLID, TIME);
 
@@ -311,7 +310,6 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int 
     snprintf(MSG, sizeof(MSG), "QUT %s\n", player);
     MSG[sizeof(MSG) - 1] = '\0';
     
-    printf("%s", MSG);
     n=sendto(fd,MSG,strlen(MSG),0,res->ai_addr,res->ai_addrlen);
     if(n==-1) {
         fprintf(stderr, "[ERR]: Couldn't send UDP request\n");
@@ -614,8 +612,8 @@ if (strncmp(response, "RTR ETM", 7) == 0) {
 
     // handle quit and exit responses
     if (strncmp(response, "RQT OK ", 7) == 0) {
-        sscanf(response, "RQT OK %s\n", code);
-        fprintf(stdout, "Quiting game... Secret color code was: %s\n", code);
+        sscanf(response, "RQT OK %s %s %s %s\n", C1, C2, C3, C4);
+        fprintf(stdout, "Quiting game... Secret color code was: %s %s %s %s\n", C1, C2, C3, C4);
         return;
     }
     if (strncmp(response, "RQT NOK", 7) == 0) {
