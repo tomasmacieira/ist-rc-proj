@@ -44,6 +44,7 @@ typedef struct player {
     int gameStatus;
 } player_t;
 
+void showtrialsCommand(int client_fd, struct player *p, int verbose);
 
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT);
 

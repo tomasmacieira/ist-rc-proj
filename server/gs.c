@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
                 close(client_fd);
             } else if (pid == 0) {
                 // Child process: Handle TCP connection
-                // HANDLE TCP
+                handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
             close(client_fd); // Parent doesn't need the client socket
             }
         }
@@ -193,6 +193,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
         break;
     // show trials
     case 3:
+        showtrialsCommand(fd, p, verbose);
         break;
     // scoreboard
     case 4:
@@ -272,6 +273,63 @@ int checkKey(struct player *p, char* C1, char* C2, char* C3, char* C4) {
     return 1;
 }
 
+void showtrialsCommand(int client_fd, struct player *p, int verbose) {
+    char buffer[1024], response[256], Fname[64], fullPath[128];
+    ssize_t bytesWritten, bytesRead;
+    int trialFile;
+    off_t fileSize;
+
+    // Prepare file path: games/PLID/GAME_PLID.txt
+    snprintf(Fname, sizeof(Fname), "GAME_%s.txt", p->PLID);
+    snprintf(fullPath, sizeof(fullPath), "games/%s/%s", p->PLID, Fname);
+
+    // Attempt to open the file
+    trialFile = open(fullPath, O_RDONLY);
+    if (trialFile < 0) {
+        // File not found or no trials
+        snprintf(response, sizeof(response), "RST NOK\n");
+        bytesWritten = write(client_fd, response, strlen(response));
+        if (bytesWritten < 0) {
+            fprintf(stderr, "[ERR]: Failed to send response to client.\n");
+        }
+        close(client_fd);
+        return;
+    }
+
+    // Get file size
+    fileSize = lseek(trialFile, 0, SEEK_END);
+    lseek(trialFile, 0, SEEK_SET);
+
+    // Send response header with status, file name, and file size
+    snprintf(response, sizeof(response), "RST OK %s %ld\n", Fname, fileSize);
+    bytesWritten = write(client_fd, response, strlen(response));
+    if (bytesWritten < 0) {
+        fprintf(stderr, "[ERR]: Failed to send response header to client.\n");
+        close(trialFile);
+        close(client_fd);
+        return;
+    }
+
+    // Send the file content in chunks
+    while ((bytesRead = read(trialFile, buffer, sizeof(buffer))) > 0) {
+        bytesWritten = write(client_fd, buffer, bytesRead);
+        if (bytesWritten < 0) {
+            fprintf(stderr, "[ERR]: Failed to send file content to client.\n");
+            break;
+        }
+    }
+
+    if (verbose) {
+        printf("[INFO]: Sent trials file '%s' for player '%s'.\n", Fname, p->PLID);
+    }
+
+    // Close file and client connection
+    close(trialFile);
+    close(client_fd);
+}
+
+
+
 void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
     ssize_t n;
     socklen_t addrlen;
@@ -295,17 +353,21 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
 
     if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || strcmp(p->PLID, PLID)!= 0){
         snprintf(response, sizeof(response), "RTR NOK\n");
+        p->attempts--;
     }
     else if (checkColors(C1[0], C2[0], C3[0], C4[0]) || strlen(p->PLID) != 6) {
         snprintf(response, sizeof(response), "RTR ERR\n");
+        p->attempts--;
     }
     else if(difftime(currentTime, p->startTime) > p->maxTime) {
         snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
+        p->attempts--;
         endGame(p);
     }
 
     else if(p->attempts != attempt && !(p->attempts - 1 == attempt && checkPreviousTry(p, try))){
         snprintf(response, sizeof(response), "RTR INV\n");
+        p->attempts--;
     }
 
     else if (p->attempts > 8) {
