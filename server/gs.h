@@ -57,9 +57,9 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
 
 int parseCommand(char command[]);
 
-void startCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t , int verbose);
+void startCommand(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t , int verbose);
 
-void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
+void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
 void chooseCode(int colorCode[], struct player *p);
 
@@ -73,13 +73,13 @@ int checkPreviousTries(struct player *p, char try[]);
 
 int checkPreviousTry(struct player *p, char try[]);
 
-void quitCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
+void quitCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
 int validPLID(char PLID[]);
 
 void endGame(player_t *player);
 
-void debugCommand(char input[], int fd, struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
+void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
 int validTime(char time[]);
 
