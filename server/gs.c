@@ -1,6 +1,6 @@
 #include "gs.h"
 
-// Array to store games
+// array to store games
 player_t Games[999999] = {0}; // Statically allocated array for players
 
 int main(int argc, char *argv[]) {
@@ -222,17 +222,18 @@ void handleTCPrequest(int client_fd, int colorCode[], int verbose) {
         return;
     }
 
-    // Parse the command
+    // parse the command
     sscanf(input, "%s %*s\n", command);
     OPCODE = parseCommand(command);
 
     switch (OPCODE) {
-    // Show trials
+    // show trials
     case 3:
         showtrialsCommand(input, client_fd, verbose);
         break;
-    // Scoreboard
+    // scoreboard
     case 4:
+        scoreboardCommand(client_fd, verbose);
         break;
     default:
         fprintf(stderr, "[ERR]: Unknown TCP command received: %s\n", command);
@@ -777,7 +778,7 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
     // parse the command
     sscanf(input, "DBG %s %s %s %s %s %s\n", PLID, time, C1, C2, C3, C4);
 
-    int id = atoi(PLID); // convert PLID to int
+    int id = atoi(PLID);      // convert PLID to int
     player_t *p = &Games[id]; // access the corresponding player in the array
 
     // check if the player has an active game
@@ -815,3 +816,106 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
     }
 }
 
+void scoreboardCommand(int client_fd, int verbose) {
+    char response[512];  
+    char Fname[64], Fsize[128], Fdata[2048];
+    char buffer[256]; // buffer for each line
+    ssize_t bytesWritten, bytesRead;
+    SCORELIST list; 
+    off_t fileSize;
+
+    memset(Fname, 0, sizeof(Fname));
+    memset(Fsize, 0, sizeof(Fsize));
+    memset(Fdata, 0, sizeof(Fdata));
+
+    // Get the top 10 scores
+    strcpy(Fname, "TOPSCORES");
+    int topScores = FindTopScores(&list);
+
+    if (topScores == 0) {
+        snprintf(response, sizeof(response), "RSS EMPTY\n");
+        bytesWritten = write(client_fd, response, strlen(response));
+        if (bytesWritten == -1) {
+            perror("[ERR]: Failed to send response to client");
+            exit(EXIT_FAILURE);
+        }
+        return;
+    } else {
+        // Prepare the header
+        snprintf(Fdata, sizeof(Fdata), "-------------------------------- TOP 10 SCORES --------------------------------\n\n"
+                                       "                 SCORE PLAYER     CODE    NO TRIALS   MODE\n\n");
+
+        // Add the scores to Fdata
+        for (int i = 0; i < list.nscores && i < 10; i++) {
+            snprintf(buffer, sizeof(buffer), 
+                     "             %2d -  %3d  %-8s  %-6s       %d       %-5s\n",
+                     i + 1,                                                       // Rank (1 to 10)
+                     list.score[i],                                               // Score
+                     list.PLID[i],                                                // PLID
+                     list.colorCode[i],                                           // Secret color code
+                     list.tries[i],                                               // Number of attempts
+                     (strcmp(list.gameMode[i], "Play") == 0) ? "Play" : "Debug"); // Game mode
+
+            strcat(Fdata, buffer);
+        }
+
+        // Get file size
+        fileSize = strlen(Fdata);
+        snprintf(Fsize, sizeof(Fsize), "%ld", fileSize); 
+
+        snprintf(response, sizeof(response), "RSS OK %s %s\n", Fname, Fsize);
+        bytesWritten = write(client_fd, response, strlen(response));
+        if (bytesWritten == -1) {
+            perror("[ERR]: Failed to send response status to client");
+            exit(EXIT_FAILURE);
+        }
+
+        // Send Fdata
+        bytesWritten = write(client_fd, Fdata, fileSize);
+        if (bytesWritten == -1) {
+            perror("[ERR]: Failed to send file content to client");
+            exit(EXIT_FAILURE);
+        }
+        return;
+    }
+}
+
+
+int FindTopScores(SCORELIST *list) {
+    struct dirent **filelist;
+    int nentries, ifile;
+    char fname[300];
+    FILE *fp;
+    char mode[8];
+    
+    nentries = scandir("server/scores/", &filelist, 0, alphasort);
+    if (nentries <= 0)
+        return (0);
+    else {
+        ifile = 0;
+        while (nentries--) {
+            if (filelist[nentries]->d_name[0] != '.' && ifile < 10) {
+                sprintf(fname, "server/scores/%s", filelist[nentries]->d_name);
+                fp = fopen(fname, "r");
+                if (fp != NULL) {
+                    fscanf(fp, "%d %s %s %d %s",
+                           &list->score[ifile],
+                           list->PLID[ifile],
+                           list->colorCode[ifile],
+                           &list->tries[ifile],
+                           mode);
+                    if (!strcmp(mode, "Play"))
+                        strcpy(list->gameMode[ifile], "Play");
+                    if (!strcmp(mode, "Debug"))
+                        strcpy(list->gameMode[ifile], "Debug");
+                    fclose(fp);
+                    ++ifile;
+                }
+            }
+            free(filelist[nentries]);
+        }
+        free(filelist);
+    }
+    list->nscores = ifile;
+    return (ifile);
+}

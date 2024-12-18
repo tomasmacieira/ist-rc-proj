@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <dirent.h>
 #include <time.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -25,6 +26,9 @@
 #define DEFAULT_PORT "58015"
 #define DEFAULT_PLAYER "999999"
 #define MAX_TRIES 8
+#define MAX_PLID_LENGTH 7
+#define MAX_CODE_LENGTH 5
+#define MAX_SCORES 8
 
 #define R 1
 #define G 2
@@ -36,15 +40,27 @@
 typedef struct player {
     time_t startTime;
     time_t maxTime;
-    char PLID[7];
+    char PLID[MAX_PLID_LENGTH];
     char gameMode[6];
     int fd;             // game tries fd
     int score_fd;       // game score fd
-    char code[5];
+    char code[MAX_CODE_LENGTH];
     int attempts;
     char tries[MAX_TRIES][5];
     int gameStatus;
 } player_t;
+
+#define MAX_COLCODE_LENGTH 8
+
+typedef struct {
+    int score[MAX_SCORES];                              // store top 10 scores
+    char PLID[MAX_SCORES][MAX_PLID_LENGTH];             // store plid for each max game
+    char colorCode[MAX_SCORES][MAX_CODE_LENGTH];        // store secret color code for each game
+    int tries[MAX_SCORES];                              // store tries for each game
+    char gameMode[MAX_SCORES][6];                       // game mode of each game
+    int nscores;                                        
+} SCORELIST;
+
 
 void showtrialsCommand(char input[], int client_fd, int verbose);
 
@@ -87,5 +103,9 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
 int validTime(char time[]);
 
 void saveGameScore(struct player *p);
+
+int FindTopScores(SCORELIST *list);
+
+void scoreboardCommand(int client_fd, int verbose);
 
 #endif

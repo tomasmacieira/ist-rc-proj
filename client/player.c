@@ -464,14 +464,18 @@ void scoreboardCommand(int fd, struct addrinfo *res) {
         close(fd);
         return;
     }
-    //fflush(stdout); 
-    //write(1, status, bytesRead);
+
     analyseResponse(status);
+
+    if (strcmp(status, "SSB EMPTY") == 0) {
+        close(fd);
+        return;}
 
     // Get the filename and filesize
     sscanf(status, "%*s %*s %s\n", Fname);
 
     bytesRead = read(fd, buffer, sizeof(buffer));
+
 
     // Save the file
     fptr = open(Fname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
