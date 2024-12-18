@@ -10,3 +10,5 @@ all:
 clean:
 	rm -f player
 	rm -f gs
+	rm -rf server/games/*
+	rm -rf server/scores/*

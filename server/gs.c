@@ -1,6 +1,5 @@
 #include "gs.h"
 
-
 // Array to store games
 player_t Games[999999] = {0}; // Statically allocated array for players
 
@@ -63,7 +62,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
+            handleUDPrequest(buffer, udp_fd, colorCode, (struct sockaddr *)&client_addr, client_len, verbose);
         }
 
         // Check TCP socket
@@ -81,7 +80,7 @@ int main(int argc, char *argv[]) {
                 close(client_fd);
             } else if (pid == 0) {
                 // Child process: Handle TCP connection
-                handleTCPrequest(client_fd, colorCode, player, verbose);
+                handleTCPrequest(client_fd, colorCode, verbose);
             close(client_fd); // Parent doesn't need the client socket
             }
         }
@@ -176,7 +175,7 @@ int createTCPSocket(const char *GSPORT, struct addrinfo **res) {
     return tcp_fd;
 }
 
-void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+void handleUDPrequest(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
 
     int OPCODE;
     char CMD[4];
@@ -207,7 +206,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
 
 }
 
-void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose) {
+void handleTCPrequest(int client_fd, int colorCode[], int verbose) {
     char input[1024], command[4];
     int OPCODE;
     ssize_t bytesRead;
@@ -230,13 +229,12 @@ void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verb
     switch (OPCODE) {
     // Show trials
     case 3:
-        showtrialsCommand(client_fd, p, verbose);
+        showtrialsCommand(input, client_fd, verbose);
         break;
     // Scoreboard
     case 4:
         break;
     default:
-        // Handle unknown commands
         fprintf(stderr, "[ERR]: Unknown TCP command received: %s\n", command);
         const char *errorResponse = "ERR Unknown command\n";
         write(client_fd, errorResponse, strlen(errorResponse));
@@ -301,13 +299,14 @@ void startCommand(char input[], int fd, int colorCode[], struct sockaddr *client
 }
 
 int checkColors(char C1, char C2, char C3, char C4) {
-    char validColors[] = "RGBYOP"; // Valid color codes
-    // Check each input against the valid colors
+    char validColors[] = "RGBYOP"; // valid color codes
+    
+    // check each input against the valid colors
     if (!strchr(validColors, C1) || !strchr(validColors, C2) || 
         !strchr(validColors, C3) || !strchr(validColors, C4)) {
-        return 1; // Invalid color found
+        return 1;
     }
-    return 0; // All colors are valid
+    return 0;
 }
 
 int checkKey(struct player *p, char* C1, char* C2, char* C3, char* C4) {
@@ -317,23 +316,45 @@ int checkKey(struct player *p, char* C1, char* C2, char* C3, char* C4) {
     return 1;
 }
 
-void showtrialsCommand(int client_fd, struct player *p, int verbose) {
-    char buffer[1024], response[256], Fname[64], fullPath[128];
+void showtrialsCommand(char input[], int client_fd, int verbose) {
+    char buffer[12], response[256], Fname[64], fullPath[128];
     ssize_t bytesWritten, bytesRead;
     int trialFile;
     off_t fileSize;
     const char *status;
-    if(p->gameStatus){
-        status = "ACT";
-    }
-    else{
-        status = "FIN";
+    char PLID[7];
+
+    
+    // parse the input to extract PLID
+    sscanf(input, "STR %s", PLID);
+
+    // Check if PLID is valid
+    int id = atoi(PLID); // convert PLID to int
+    if (id < 0 || strlen(PLID) != 6) {
+        // invalid PLID or no ongoing game
+        snprintf(response, sizeof(response), "RST NOK\n");
+        bytesWritten = write(client_fd, response, strlen(response));
+        if (bytesWritten < 0) {
+            fprintf(stderr, "[ERR]: Failed to send response to client.\n");
+        }
+        close(client_fd);
+        return;
     }
 
-    // Prepare file path: games/PLID/GAME_PLID.txt
+    // get the player from the Games array
+    player_t *p = &Games[id];
+
+    // set the game status based on the player's current game state
+    if (p->gameStatus == 1) {
+        status = "ACT";  // Active game
+    } else {
+        status = "FIN";  // Finished game
+    }
+
+    // file path: server/games/PLID/GAME_PLID.txt
     snprintf(fullPath, sizeof(fullPath), "server/games/%s/GAME_%s.txt", p->PLID, p->PLID);
     snprintf(Fname, sizeof(Fname), "GAME_%s.txt", p->PLID);
-    // Attempt to open the file
+
     trialFile = open(fullPath, O_RDONLY);
     if (trialFile < 0) {
         // File not found or no trials
@@ -346,7 +367,6 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
         return;
     }
 
-    // Get file size
     fileSize = lseek(trialFile, 0, SEEK_END);
     if (fileSize == -1) {
         perror("[ERR]: Failed to determine file size");
@@ -356,7 +376,7 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
     }
     lseek(trialFile, 0, SEEK_SET);
 
-// Send response header with status, file name, and file size
+    // send response header with status, file name, and file size
     snprintf(response, sizeof(response), "RST %s %s %ld\n", status, Fname, fileSize);
     bytesWritten = write(client_fd, response, strlen(response));
     if (bytesWritten < 0) {
@@ -366,7 +386,7 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
         return;
     }
 
-    // Send the file content in chunks
+    // send the file content in chunks
     while ((bytesRead = read(trialFile, buffer, sizeof(buffer))) > 0) {
         bytesWritten = write(client_fd, buffer, bytesRead);
         if (bytesWritten < 0) {
@@ -381,7 +401,6 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
 
     // Close file and client connection
     close(trialFile);
-    close(client_fd);
 }
 
 void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
@@ -397,8 +416,8 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
     time_t currentTime = time(NULL);
     sscanf(input, "TRY %s %s %s %s %s %d\n", PLID, C1, C2, C3, C4, &attempt);
     
-    int id = atoi(PLID); // Convert PLID to an integer index
-    player_t *p = &Games[id]; // Directly access the player_t struct in the array
+    int id = atoi(PLID); // convert PLID to int
+    player_t *p = &Games[id]; // access the player_t struct in the array
     p->attempts++;
     memset(try, 0, sizeof(try));
      // register try
@@ -439,14 +458,14 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
     }
     else {
 
-        int sameColor[4] = {0, 0, 0, 0};                        // Register for correct colors in diferent positions
+        int sameColor[4] = {0, 0, 0, 0};                        // register correct colors in diferent positions
         int correctColorsPositions[4] = {0, 0, 0, 0};           // register correct colors in correct positions
 
         // find nB (correct colors in correct positions)
         for (int i = 0; i < 4; i++) {
             if (try[i] == p->code[i]) {
                 nB++;
-                sameColor[i] = 1;                               // Register as seen
+                sameColor[i] = 1;                               // register as seen
                 correctColorsPositions[i] = 1;
             }
         }
@@ -457,7 +476,7 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
             for (int j = 0; j < 4; j++) {
                 if (!sameColor[j] && try[i] == p->code[j]) {
                     nW++;
-                    sameColor[j] = 1;                           // Mark this position in code as matched
+                    sameColor[j] = 1;                           // mark this position in code as seen
                     break;
                 }
             }
@@ -543,7 +562,6 @@ void saveGameScore(struct player *p) {
     close(p->score_fd); 
 }
 
-
 void createGameFile(struct player *p, char mode, int timeLimit) {
     char filepath[48];
     char dirname[48];
@@ -601,7 +619,7 @@ void chooseCode(int code[], struct player *p) {
     srand(time(NULL));
 
     for (int i = 0; i < 4; i++) {
-        code[i] = (rand() % 6) + 1;  // Generate a number between 1 and 6
+        code[i] = (rand() % 6) + 1;  // generate a number between 1 and 6
 
         switch (code[i]) {
             case R:
@@ -634,10 +652,10 @@ void printDescription(char input[], char PLID[], struct sockaddr *client_addr, s
 
     struct sockaddr_in *addr_in = (struct sockaddr_in *)client_addr;
 
-    // Get the IP address
+    // get the IP address
     inet_ntop(AF_INET, &addr_in->sin_addr, client_ip, sizeof(client_ip));
 
-    // Get the port number
+    // get the port number
     int client_port = ntohs(addr_in->sin_port);
 
     char CMD[4];
@@ -680,16 +698,16 @@ void quitCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t c
 
     sscanf(input, "QUT %s\n", PLID);
 
-    // Get the player from the Games array using the PLID as index
-    int id = atoi(PLID); // Convert PLID to an integer index
-    player_t *p = &Games[id]; // Access the corresponding player object in the array
+    // get the player from the Games array using the PLID as index
+    int id = atoi(PLID);      // Convert PLID to an int
+    player_t *p = &Games[id]; // access the corresponding player in the array
 
-    // Check if the player has an ongoing game
+    // check if the player has an ongoing game
     if (p->gameStatus == 0 || !validPLID(PLID)) {
         snprintf(response, sizeof(response), "RQT NOK\n");
     }
     else if (p->gameStatus == 1) { 
-        // Save the player's code before ending the game
+        // save the player's code before ending the game
         C1[0] = p->code[0];
         C1[1] = '\0';  
 
@@ -702,29 +720,23 @@ void quitCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t c
         C4[0] = p->code[3];
         C4[1] = '\0';
 
-        // End the game for this player
         endGame(p);
 
-        // Prepare response indicating successful game termination
         snprintf(response, sizeof(response), "RQT OK %s %s %s %s\n", C1, C2, C3, C4);
     }
     else { 
-        // If no valid player or ongoing game, return error response
         snprintf(response, sizeof(response), "RQT ERR\n");
     }
 
-    // Optionally print debug information if verbose mode is enabled
     if (verbose) {
         printDescription(input, PLID, client_addr, client_len);
     }
 
-    // Send the response back to the client
     if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
         fprintf(stderr, "[ERR]: Couldn't send UDP response\n");
         exit(EXIT_FAILURE);
     }
     
-    // Additional end game call after responding (cleanup, if necessary)
     endGame(p);
 }
 
@@ -737,7 +749,7 @@ void endGame(player_t *player) {
         return;
     }
 
-    // Clear the entire player structure
+    // clear the entire player structure
     memset(player, 0, sizeof(player_t));
 
     // Set specific default values
@@ -762,31 +774,30 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
     char C1[2], C2[2], C3[2], C4[2];
     char response[100];
 
-    // Parse the command
+    // parse the command
     sscanf(input, "DBG %s %s %s %s %s %s\n", PLID, time, C1, C2, C3, C4);
 
-    int id = atoi(PLID); // Convert PLID to an integer index
-    player_t *p = &Games[id]; // Access the corresponding player object in the array
+    int id = atoi(PLID); // convert PLID to int
+    player_t *p = &Games[id]; // access the corresponding player in the array
 
-    // Check if the player has an active game
+    // check if the player has an active game
     if (p->gameStatus == 1 && p->attempts > 0) {
         snprintf(response, sizeof(response), "RDB NOK\n");
     } else if (validPLID(PLID) && validTime(time)) { 
         // Reset player stats
-        endGame(p); // Clean up any existing game state
+        endGame(p);
         strcpy(p->PLID, PLID);
         strcpy(p->gameMode, "Debug");
         p->maxTime = atoi(time);
         p->attempts = 0;
 
-        // Set the new debug code
+        // set the new debug code
         p->code[0] = C1[0];
         p->code[1] = C2[0];
         p->code[2] = C3[0];
         p->code[3] = C4[0];
         p->code[4] = '\0';
 
-        // Update game status and create a debug game file
         p->gameStatus = 1;
         snprintf(response, sizeof(response), "RDB OK\n");
         createGameFile(p, 'D', atoi(time));
@@ -794,12 +805,10 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
         snprintf(response, sizeof(response), "RDB ERR\n");
     }
 
-    // Optionally print debug info if verbose mode is enabled
     if (verbose) {
         printDescription(input, PLID, client_addr, client_len);
     }
 
-    // Send the response back to the client
     if (sendto(fd, response, strlen(response), 0, client_addr, client_len) == -1) {
         fprintf(stderr, "[ERR]: Couldn't send UDP response\n");
         exit(EXIT_FAILURE);
