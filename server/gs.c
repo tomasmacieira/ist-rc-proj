@@ -428,48 +428,28 @@ void tryCommand(char input[], int fd, int colorCode[], struct player *p, struct 
         p->attempts--;
     }
     else {
+
+        int sameColor[4] = {0, 0, 0, 0};                        // Register for correct colors in diferent positions
+        int correctColorsPositions[4] = {0, 0, 0, 0};           // register correct colors in correct positions
+
+        // find nB (correct colors in correct positions)
         for (int i = 0; i < 4; i++) {
-            int temp_nB = 0, temp_nW = 0;
-            if(C1[0] == p->code[i]){
-                if(i == 0){
-                    temp_nB++;
-                }
-                else {
-                    temp_nW++;
-                }
-            }
-            if(C2[0] == p->code[i]){
-                if(i == 1){
-                    temp_nB++;
-                    temp_nW = 0;
-                }
-                else {
-                    temp_nW++;
-                }
-            }
-            if(C3[0] == p->code[i]){
-                if(i == 2){
-                    temp_nB++;
-                    temp_nW = 0;
-                }
-                else {
-                    temp_nW++;
-                }
-            }
-            if(C4[0] == p->code[i]){
-                if(i == 3){
-                    temp_nB++;
-                    temp_nW = 0;
-                }
-                else{
-                    temp_nW++;
-                }
-            }
-            if(temp_nB != 0){
+            if (try[i] == p->code[i]) {
                 nB++;
+                sameColor[i] = 1;                               // Register as seen
+                correctColorsPositions[i] = 1;
             }
-            else if(temp_nW != 0){
-                nW++;
+        }
+
+        // find nW (correct color in wrong positions)
+        for (int i = 0; i < 4; i++) {
+            if (correctColorsPositions[i]) continue;            // this color increased nB 
+            for (int j = 0; j < 4; j++) {
+                if (!sameColor[j] && try[i] == p->code[j]) {
+                    nW++;
+                    sameColor[j] = 1;                           // Mark this position in code as matched
+                    break;
+                }
             }
         }
         snprintf(response, sizeof(response), "RTR OK %d %d %d\n", p->attempts, nB, nW);
