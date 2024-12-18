@@ -193,12 +193,6 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
     case 2:
         tryCommand(input, fd, colorCode, client_addr, client_len, verbose);
         break;
-    // show trials
-    case 3:
-        break;
-    // scoreboard
-    case 4:
-        break;
     // quit or exit
     case 5:
         quitCommand(input, fd, client_addr, client_len, verbose);
@@ -212,6 +206,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
     }
 
 }
+
 void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose) {
     char input[1024], command[4];
     int OPCODE;
@@ -281,6 +276,7 @@ void startCommand(char input[], int fd, int colorCode[], struct sockaddr *client
         player->attempts = 0;
         player->maxTime = atoi(gameTime);
         player->gameStatus = 1;
+        strcpy(player->gameMode, "Play");
 
         // Generate the code for the game
         chooseCode(colorCode, player);
@@ -388,8 +384,6 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
     close(client_fd);
 }
 
-
-
 void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
     ssize_t n;
     socklen_t addrlen;
@@ -472,10 +466,10 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
         strcpy(p->tries[p->attempts - 1], try);
         writeTry(p, nB, nW);
         if(nB == 4){
+            saveGameScore(p);
             endGame(p);
         }
     }
-
 
     if (verbose) {
         printDescription(input, p->PLID, client_addr, client_len);
@@ -485,6 +479,70 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
         exit(EXIT_FAILURE);
     }
 }
+
+void saveGameScore(struct player *p) {
+    char filepath[100];
+    char date[20]; 
+    char hours[20];
+    char firstLine[128];
+    time_t fulltime;
+    time_t currentTime = time(NULL);
+    struct tm *current_time;
+    char scoreStr[4];
+
+    time(&fulltime);
+
+    current_time = gmtime(&fulltime);
+
+    // format date and hours
+    snprintf(date, sizeof(date), "%4d%02d%02d",
+             current_time->tm_year + 1900,
+             current_time->tm_mon + 1,
+             current_time->tm_mday);
+
+    snprintf(hours, sizeof(hours), "%02d%02d%02d",
+             current_time->tm_hour,
+             current_time->tm_min,
+             current_time->tm_sec);
+
+    // calculate time taken
+    int timeTaken = (int)(currentTime - p->startTime); 
+
+    // calculate score
+    int score = (((600 - timeTaken) / 600.0) * 70) + (((8 - p->attempts) / 8.0) * 30);
+    if (score < 0) score = 0;
+    if (score > 100) score = 100; 
+
+    // convert score to a 3-digit string
+    snprintf(scoreStr, sizeof(scoreStr), "%03d", score);
+
+    // format: <score PLID DDMMYYYY HHMMSS.txt>
+    snprintf(filepath, sizeof(filepath), "./server/scores/%s_%s_%s_%s.txt", scoreStr, p->PLID, date, hours);
+
+    p->score_fd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (p->score_fd == -1) {
+        fprintf(stderr, "[ERR]: open failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Write the first line to the file
+    snprintf(firstLine, sizeof(firstLine),
+             "%s %s %s %d %s\n",
+             scoreStr,          // Score
+             p->PLID,           // PLID
+             p->code,           // Secret code to win
+             p->attempts,       // Number of attempts
+             p->gameMode);      // Mode (play or debug)
+
+    if (write(p->score_fd, firstLine, strlen(firstLine)) == -1) {
+        fprintf(stderr, "[ERR]: write failed\n");
+        close(p->score_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    close(p->score_fd); 
+}
+
 
 void createGameFile(struct player *p, char mode, int timeLimit) {
     char filepath[48];
@@ -670,8 +728,6 @@ void quitCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t c
     endGame(p);
 }
 
-
-
 int validPLID(char PLID[]) {
     return strlen(PLID) == 6;
 }
@@ -687,10 +743,12 @@ void endGame(player_t *player) {
     // Set specific default values
     strncpy(player->PLID, DEFAULT_PLAYER, sizeof(player->PLID) - 1);  
     player->PLID[sizeof(player->PLID) - 1] = '\0';                    // null termination
+    memset(player->gameMode, 0, sizeof(player->gameMode));
     player->gameStatus = 0;
     player->startTime = 0;
     player->maxTime = 0;
     player->fd = -1;
+    player->score_fd = -1;
     player->attempts = 0;
 }
 
@@ -717,6 +775,7 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
         // Reset player stats
         endGame(p); // Clean up any existing game state
         strcpy(p->PLID, PLID);
+        strcpy(p->gameMode, "Debug");
         p->maxTime = atoi(time);
         p->attempts = 0;
 

@@ -37,7 +37,9 @@ typedef struct player {
     time_t startTime;
     time_t maxTime;
     char PLID[7];
-    int fd;             // game fd
+    char gameMode[6];
+    int fd;             // game tries fd
+    int score_fd;       // game score fd
     char code[5];
     int attempts;
     char tries[MAX_TRIES][5];
@@ -47,6 +49,7 @@ typedef struct player {
 void showtrialsCommand(int client_fd, struct player *p, int verbose);
 
 void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose);
+
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT);
 
 int createUDPSocket(const char *GSPORT, struct addrinfo **res);
@@ -82,5 +85,7 @@ void endGame(player_t *player);
 void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
 int validTime(char time[]);
+
+void saveGameScore(struct player *p);
 
 #endif
