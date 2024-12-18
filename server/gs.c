@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            handleUDPrequest(buffer, udp_fd, colorCode, player, (struct sockaddr *)&client_addr, client_len, verbose);
+            handleUDPrequest(buffer, udp_fd, colorCode, (struct sockaddr *)&client_addr, client_len, verbose);
         }
 
         // Check TCP socket
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
                 close(client_fd);
             } else if (pid == 0) {
                 // Child process: Handle TCP connection
-                handleTCPrequest(client_fd, colorCode, player, verbose);
+                handleTCPrequest(client_fd, colorCode, verbose);
             close(client_fd); // Parent doesn't need the client socket
             }
         }
@@ -176,7 +176,7 @@ int createTCPSocket(const char *GSPORT, struct addrinfo **res) {
     return tcp_fd;
 }
 
-void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
+void handleUDPrequest(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
 
     int OPCODE;
     char CMD[4];
@@ -212,7 +212,7 @@ void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, s
     }
 
 }
-void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose) {
+void handleTCPrequest(int client_fd, int colorCode[], int verbose) {
     char input[1024], command[4];
     int OPCODE;
     ssize_t bytesRead;
@@ -235,7 +235,7 @@ void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verb
     switch (OPCODE) {
     // Show trials
     case 3:
-        showtrialsCommand(client_fd, p, verbose);
+        showtrialsCommand(input, client_fd, verbose);
         break;
     // Scoreboard
     case 4:
@@ -321,22 +321,45 @@ int checkKey(struct player *p, char* C1, char* C2, char* C3, char* C4) {
     return 1;
 }
 
-void showtrialsCommand(int client_fd, struct player *p, int verbose) {
-    char buffer[1024], response[256], Fname[64], fullPath[128];
+void showtrialsCommand(char input[], int client_fd, int verbose) {
+    char buffer[12], response[256], Fname[64], fullPath[128];
     ssize_t bytesWritten, bytesRead;
     int trialFile;
     off_t fileSize;
     const char *status;
-    if(p->gameStatus){
-        status = "ACT";
-    }
-    else{
-        status = "FIN";
+    char PLID[7];
+
+    
+    // Parse the input to extract PLID (assuming "STR PLID" format)
+    sscanf(input, "STR %s", PLID);
+
+    // Check if PLID is valid
+    int id = atoi(PLID); // Convert PLID to an integer index
+    if (id < 0 || strlen(PLID) != 6) {
+        // Invalid PLID or no ongoing game
+        snprintf(response, sizeof(response), "RST NOK\n");
+        bytesWritten = write(client_fd, response, strlen(response));
+        if (bytesWritten < 0) {
+            fprintf(stderr, "[ERR]: Failed to send response to client.\n");
+        }
+        close(client_fd);
+        return;
     }
 
-    // Prepare file path: games/PLID/GAME_PLID.txt
+    // Get the player from the Games array
+    player_t *p = &Games[id];
+
+    // Set the game status based on the player's current game state
+    if (p->gameStatus == 1) {
+        status = "ACT";  // Active game
+    } else {
+        status = "FIN";  // Finished game
+    }
+
+    // Prepare file path: server/games/PLID/GAME_PLID.txt
     snprintf(fullPath, sizeof(fullPath), "server/games/%s/GAME_%s.txt", p->PLID, p->PLID);
     snprintf(Fname, sizeof(Fname), "GAME_%s.txt", p->PLID);
+
     // Attempt to open the file
     trialFile = open(fullPath, O_RDONLY);
     if (trialFile < 0) {
@@ -360,7 +383,7 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
     }
     lseek(trialFile, 0, SEEK_SET);
 
-// Send response header with status, file name, and file size
+    // Send response header with status, file name, and file size
     snprintf(response, sizeof(response), "RST %s %s %ld\n", status, Fname, fileSize);
     bytesWritten = write(client_fd, response, strlen(response));
     if (bytesWritten < 0) {
@@ -387,6 +410,7 @@ void showtrialsCommand(int client_fd, struct player *p, int verbose) {
     close(trialFile);
     close(client_fd);
 }
+
 
 
 

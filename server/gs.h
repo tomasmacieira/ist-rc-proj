@@ -44,16 +44,16 @@ typedef struct player {
     int gameStatus;
 } player_t;
 
-void showtrialsCommand(int client_fd, struct player *p, int verbose);
+void showtrialsCommand(char input[], int client_fd, int verbose);
 
-void handleTCPrequest(int client_fd, int colorCode[], struct player *p, int verbose);
+void handleTCPrequest(int client_fd, int colorCode[], int verbose);
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT);
 
 int createUDPSocket(const char *GSPORT, struct addrinfo **res);
 
 int createTCPSocket(const char *GSPORT, struct addrinfo **res);
 
-void handleUDPrequest(char input[], int fd, int colorCode[], struct player *p, struct sockaddr *client_addr, socklen_t client_len, int verbose);
+void handleUDPrequest(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose);
 
 int parseCommand(char command[]);
 
