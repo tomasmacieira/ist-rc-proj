@@ -354,8 +354,8 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
     }
 
     // file path: server/games/PLID/GAME_PLID.txt
-    snprintf(fullPath, sizeof(fullPath), "server/games/%s/GAME_%s.txt", p->PLID, p->PLID);
-    snprintf(Fname, sizeof(Fname), "GAME_%s.txt", p->PLID);
+    snprintf(fullPath, sizeof(fullPath), "server/games/%s/GAME_%s.txt", PLID, PLID);
+    snprintf(Fname, sizeof(Fname), "GAME_%s.txt", PLID);
 
     trialFile = open(fullPath, O_RDONLY);
     if (trialFile < 0) {
@@ -393,7 +393,7 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
 
 
     if (verbose) {
-        printf("[INFO]: Sent trials file '%s' for player '%s'.\n", Fname, p->PLID);
+        printf("[INFO]: Sent trials file '%s' for player '%s'.\n", Fname, PLID);
     }
 
     // Close file and client connection
