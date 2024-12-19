@@ -817,7 +817,7 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
 }
 
 void scoreboardCommand(int client_fd, int verbose) {
-    char response[512];  
+    char response[4098];  
     char Fname[64], Fsize[128], Fdata[2048];
     char buffer[256]; // buffer for each line
     ssize_t bytesWritten, bytesRead;
@@ -863,23 +863,22 @@ void scoreboardCommand(int client_fd, int verbose) {
         fileSize = strlen(Fdata);
         snprintf(Fsize, sizeof(Fsize), "%ld", fileSize); 
 
-        snprintf(response, sizeof(response), "RSS OK %s %s\n", Fname, Fsize);
+        snprintf(response, sizeof(response), "RSS OK %s %s %s\n", Fname, Fsize, Fdata);
         bytesWritten = write(client_fd, response, strlen(response));
         if (bytesWritten == -1) {
             perror("[ERR]: Failed to send response status to client");
             exit(EXIT_FAILURE);
         }
-
+        /*
         // Send Fdata
         bytesWritten = write(client_fd, Fdata, fileSize);
         if (bytesWritten == -1) {
             perror("[ERR]: Failed to send file content to client");
             exit(EXIT_FAILURE);
-        }
+        }*/
         return;
     }
 }
-
 
 int FindTopScores(SCORELIST *list) {
     struct dirent **filelist;

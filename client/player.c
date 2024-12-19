@@ -337,8 +337,6 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int 
         }
         attempts++;
     }
-
-    analyseResponse(buffer);
     
     // in case user asked to exit the app
     if (exitCommand) { 
@@ -347,6 +345,8 @@ void quitCommand(char input[], int fd, struct addrinfo *res, char player[], int 
         close(fd);
         exit(0);
     }
+
+    analyseResponse(buffer);
 }
 
 void debugCommand(char input[], int fd, struct addrinfo *res, char player[], int *trialCount) {
