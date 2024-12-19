@@ -81,6 +81,7 @@ int main(int argc, char *argv[]) {
             } else if (pid == 0) {
                 // Child process: Handle TCP connection
                 handleTCPrequest(client_fd, colorCode, verbose);
+                exit(EXIT_SUCCESS);
             close(client_fd); // Parent doesn't need the client socket
             }
         }
@@ -426,8 +427,8 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
     strcat(try, C2);
     strcat(try, C3);
     strcat(try, C4);
-    printf("Here: %s", p->PLID);
 
+    printf("%d\n", p->gameStatus);    
     if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || p->gameStatus != 1){
         snprintf(response, sizeof(response), "RTR NOK\n");
         p->attempts--;
@@ -869,13 +870,6 @@ void scoreboardCommand(int client_fd, int verbose) {
             perror("[ERR]: Failed to send response status to client");
             exit(EXIT_FAILURE);
         }
-        /*
-        // Send Fdata
-        bytesWritten = write(client_fd, Fdata, fileSize);
-        if (bytesWritten == -1) {
-            perror("[ERR]: Failed to send file content to client");
-            exit(EXIT_FAILURE);
-        }*/
         return;
     }
 }
