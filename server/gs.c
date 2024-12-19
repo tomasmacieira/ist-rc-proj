@@ -318,7 +318,7 @@ int checkKey(struct player *p, char* C1, char* C2, char* C3, char* C4) {
 }
 
 void showtrialsCommand(char input[], int client_fd, int verbose) {
-    char buffer[12], response[256], Fname[64], fullPath[128];
+    char buffer[2046], response[4098], Fname[64], fullPath[128];
     ssize_t bytesWritten, bytesRead;
     int trialFile;
     off_t fileSize;
@@ -368,17 +368,18 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
         return;
     }
 
-    fileSize = lseek(trialFile, 0, SEEK_END);
-    if (fileSize == -1) {
-        perror("[ERR]: Failed to determine file size");
-        close(trialFile);
-        close(client_fd);
-        return;
-    }
-    lseek(trialFile, 0, SEEK_SET);
 
+
+    while ((bytesRead = read(trialFile, buffer, sizeof(buffer))) > 0) {
+        if (bytesWritten < 0) {
+            fprintf(stderr, "[ERR]: Failed to send file content to client.\n");
+            break;
+        }
+    }
+    
+    fileSize = strlen(buffer);
     // send response header with status, file name, and file size
-    snprintf(response, sizeof(response), "RST %s %s %ld\n", status, Fname, fileSize);
+    snprintf(response, sizeof(response), "RST %s %s %ld %s\n", status, Fname, fileSize,buffer);
     bytesWritten = write(client_fd, response, strlen(response));
     if (bytesWritten < 0) {
         fprintf(stderr, "[ERR]: Failed to send response header to client.\n");
@@ -388,13 +389,7 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
     }
 
     // send the file content in chunks
-    while ((bytesRead = read(trialFile, buffer, sizeof(buffer))) > 0) {
-        bytesWritten = write(client_fd, buffer, bytesRead);
-        if (bytesWritten < 0) {
-            fprintf(stderr, "[ERR]: Failed to send file content to client.\n");
-            break;
-        }
-    }
+
 
     if (verbose) {
         printf("[INFO]: Sent trials file '%s' for player '%s'.\n", Fname, p->PLID);
