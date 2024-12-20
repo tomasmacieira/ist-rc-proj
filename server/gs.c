@@ -263,7 +263,7 @@ void startCommand(char input[], int fd, int colorCode[], struct sockaddr *client
     sscanf(input, "SNG %s %s\n", PLID, gameTime);
 
     // Validate PLID and gameTime
-    if (strlen(PLID) != 6 || strlen(gameTime) != 3 || (atoi(gameTime) < 1 || atoi(gameTime) > 600)) {
+    if (!validPLID(PLID) || !validTime(gameTime)) {
         snprintf(response, sizeof(response), "RSG ERR\n");
     } else if (Games[atoi(PLID)].gameStatus == 1) {
         // Check if the game is already active
@@ -377,7 +377,9 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
             break;
         }
     }
-    
+    if(p->gameStatus == 1){
+        snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "\nTime remaining: %ds\n", (int)(p->maxTime - difftime(time(NULL),p->startTime)));
+    }
     fileSize = strlen(buffer);
     // send response header with status, file name, and file size
     snprintf(response, sizeof(response), "RST %s %s %ld %s\n", status, Fname, fileSize,buffer);
@@ -762,7 +764,7 @@ void endGame(player_t *player) {
 }
 
 int validTime(char time[]) {
-    return (strlen(time) == 3 && atoi(time) >= 1 && atoi(time) <= 600);
+    return atoi(time) >= 1 && atoi(time) <= 600;
 }
 
 void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t client_len, int verbose) {
