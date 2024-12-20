@@ -459,10 +459,8 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
         p->attempts--;
     }
 
-    else if (p->attempts > 8) {
-        if(checkKey(p, C1, C2, C3, C4)){
-            snprintf(response, sizeof(response), "RTR ENT\n");
-        }
+    else if (p->attempts >= 8 && checkKey(p, C1, C2, C3, C4)) {
+        snprintf(response, sizeof(response), "RTR ENT %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
         endGame(p);
     }
     else if (checkPreviousTries(p, try)) {

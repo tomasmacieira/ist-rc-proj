@@ -608,7 +608,8 @@ void analyseResponse(char response[]) {
         return;
     }
     if (strncmp(response, "RTR ENT", 7) == 0) {
-        fprintf(stdout, "No more attempts left\n");
+        sscanf(response, "RTR ENT %s %s %s %s\n", C1, C2, C3, C4);
+        fprintf(stdout, "No more attempts left! Secret color code was: %s %s %s %s\n", C1, C2, C3, C4);
         return;
     } 
     if (strncmp(response, "RTR ETM", 7) == 0) {
