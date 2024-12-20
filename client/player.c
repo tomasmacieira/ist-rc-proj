@@ -467,7 +467,7 @@ void scoreboardCommand(int fd, struct addrinfo *res) {
 
     analyseResponse(status);
 
-    if (strcmp(status, "SSB EMPTY") == 0) {
+    if (strncmp(status, "RSS EMPTY", 9) == 0) {
         close(fd);
         return;}
 
