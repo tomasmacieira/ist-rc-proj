@@ -261,16 +261,18 @@ void startCommand(char input[], int fd, int colorCode[], struct sockaddr *client
     char code[5];
 
     sscanf(input, "SNG %s %s\n", PLID, gameTime);
-
+    player_t *player = &Games[atoi(PLID)];
+    if(Timeout(player)){
+        endGame(player);
+    }
     // Validate PLID and gameTime
     if (!validPLID(PLID) || !validTime(gameTime)) {
         snprintf(response, sizeof(response), "RSG ERR\n");
-    } else if (Games[atoi(PLID)].gameStatus == 1) {
+    } else if (player->gameStatus == 1) {
         // Check if the game is already active
         snprintf(response, sizeof(response), "RSG NOK\n");
     } else {
-        // Initialize the game directly in Games array
-        player_t *player = &Games[atoi(PLID)]; // Access the `player_t` object in the array
+
         memset(player, 0, sizeof(player_t));  // Reset the player's data
         strcpy(player->PLID, PLID);
         player->attempts = 0;
@@ -345,7 +347,9 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
 
     // get the player from the Games array
     player_t *p = &Games[id];
-
+    if(Timeout(p)){
+        endGame(p);
+    }
     // set the game status based on the player's current game state
     if (p->gameStatus == 1) {
         status = "ACT";  // Active game
@@ -380,6 +384,9 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
     if(p->gameStatus == 1){
         snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "\nTime remaining: %ds\n", (int)(p->maxTime - difftime(time(NULL),p->startTime)));
     }
+    else{
+        snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "\nTimeout, game time was: %ds\n", (int)p->maxTime);
+    }
     fileSize = strlen(buffer);
     // send response header with status, file name, and file size
     snprintf(response, sizeof(response), "RST %s %s %ld %s\n", status, Fname, fileSize,buffer);
@@ -401,6 +408,14 @@ void showtrialsCommand(char input[], int client_fd, int verbose) {
     // Close file and client connection
     close(trialFile);
 }
+
+int Timeout(player_t* p){
+    if(p->maxTime != 0){    
+        return difftime(time(NULL), p->startTime) > p->maxTime;
+    }
+    return 0;
+}
+
 
 void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_addr, socklen_t client_len, int verbose) {
     ssize_t n;
@@ -434,7 +449,7 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
         snprintf(response, sizeof(response), "RTR ERR\n");
         p->attempts--;
     }
-    else if(difftime(currentTime, p->startTime) > p->maxTime) {
+    else if(Timeout(p)) {
         snprintf(response, sizeof(response), "RTR ETM %c %c %c %c\n", p->code[0], p->code[1], p->code[2], p->code[3]);
         p->attempts--;
         endGame(p);
@@ -744,6 +759,7 @@ int validPLID(char PLID[]) {
 }
 
 void endGame(player_t *player) {
+    time_t maxTimeTemp = player->maxTime;
     if (player == NULL) {
         return;
     }
@@ -757,7 +773,7 @@ void endGame(player_t *player) {
     memset(player->gameMode, 0, sizeof(player->gameMode));
     player->gameStatus = 0;
     player->startTime = 0;
-    player->maxTime = 0;
+    player->maxTime = maxTimeTemp;
     player->fd = -1;
     player->score_fd = -1;
     player->attempts = 0;
@@ -778,7 +794,9 @@ void debugCommand(char input[], int fd, struct sockaddr *client_addr, socklen_t 
 
     int id = atoi(PLID);      // convert PLID to int
     player_t *p = &Games[id]; // access the corresponding player in the array
-
+    if(Timeout(p)){
+        endGame(p);
+    }
     // check if the player has an active game
     if (p->gameStatus == 1 && p->attempts > 0) {
         snprintf(response, sizeof(response), "RDB NOK\n");

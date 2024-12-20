@@ -61,7 +61,7 @@ typedef struct {
     int nscores;                                        
 } SCORELIST;
 
-
+int Timeout(player_t* p);
 void showtrialsCommand(char input[], int client_fd, int verbose);
 
 void parseArguments(int argc, char *argv[], int *verbose, char **GSPORT);
