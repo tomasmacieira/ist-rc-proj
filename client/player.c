@@ -180,7 +180,7 @@ void tryCommand(char input[], int fd, struct addrinfo *res, char PLID[], int *tr
 
     // Validate command format
     if (strlen(C1) != 1 || strlen(C2) != 1 || strlen(C3) != 1 || strlen(C4) != 1) {
-        fprintf(stderr, "[ERR]: Invalid code format. Each guess must be a single character.\n");
+        fprintf(stderr, "[ERR]: Invalid code format. Each guess must be a single character: TRY <C1> <C2> <C3> <C4>.\n");
         return;
     }
 
@@ -370,7 +370,7 @@ void debugCommand(char input[], int fd, struct addrinfo *res, char player[], int
 
     // Player ID is a 6 digit number
     if (strlen(PLID) != 6 || strspn(PLID, "0123456789") != 6) {
-        fprintf(stderr, "[ERR]: Invalid PLID: %s\n", PLID);
+        fprintf(stderr, "[ERR]: Invalid PLID: %s\nMust be a 6 digit number\n", PLID);
         return;
     }
 
@@ -383,7 +383,7 @@ void debugCommand(char input[], int fd, struct addrinfo *res, char player[], int
     // Play time is a 3 digit number between 1 and 600
     int play_time = atoi(TIME);
     if (play_time < 1 || play_time > 600) {
-        fprintf(stderr, "[ERR]: Invalid time: %s\n", TIME);
+        fprintf(stderr, "[ERR]: Invalid time: %s\nMust be a 3 digit number between 1 and 600\n", TIME);
         return;
     }
 
@@ -574,7 +574,7 @@ void analyseResponse(char response[]) {
         return;
     }
     if (strcmp(response, "RSG ERR\n") == 0) {
-        fprintf(stdout, "Invalid syntax\n");
+        fprintf(stdout, "Invalid syntax\nFORMAT: start PLID TIME\n");
         return;
     }
 
@@ -618,7 +618,7 @@ void analyseResponse(char response[]) {
         return;
     }
     if (strncmp(response, "RTR ERR", 7) == 0) {
-        fprintf(stdout, "Wrong Syntax on try request\n");
+        fprintf(stdout, "Wrong Syntax on try request\nFORMAT: TRY <C1> <C2> <C3> <C4>\nAvailable colors: R G B Y O P\n");
         return;
     }
 
@@ -648,7 +648,7 @@ void analyseResponse(char response[]) {
         return;
     }
     if (strcmp(response, "RDB ERR\n") == 0) {
-        fprintf(stdout, "Wrong Syntax on debug request\n");
+        fprintf(stdout, "Wrong Syntax on debug request\nFORMAT: debug <PLID> <max_playtime> <C1> <C2> <C3> <C4>\nAvailable colors: R G B Y O P\n");
         return;
     }
 

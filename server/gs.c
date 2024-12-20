@@ -440,7 +440,6 @@ void tryCommand(char input[], int fd, int colorCode[], struct sockaddr *client_a
     strcat(try, C3);
     strcat(try, C4);
 
-    printf("%d\n", p->gameStatus);    
     if(strcmp(p->PLID,DEFAULT_PLAYER)==0 || p->gameStatus != 1){
         snprintf(response, sizeof(response), "RTR NOK\n");
         p->attempts--;
@@ -855,6 +854,10 @@ void scoreboardCommand(int client_fd, int verbose) {
             perror("[ERR]: Failed to send response to client");
             exit(EXIT_FAILURE);
         }
+
+        if (verbose) {
+            printf("Recieving SCOREBOARD command\n");
+        }
         return;
     } else {
         // Prepare the header
@@ -885,6 +888,11 @@ void scoreboardCommand(int client_fd, int verbose) {
             perror("[ERR]: Failed to send response status to client");
             exit(EXIT_FAILURE);
         }
+
+        if (verbose) {
+            printf("Recieving SCOREBOARD command\n");
+        }
+        
         return;
     }
 }
